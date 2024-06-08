@@ -6,9 +6,9 @@
 class Transport_Base
 {
     public:
-        bool setup();
-        size_t sendPacket(std::vector<uint8_t> buf);
-        std::vector<uint8_t> readPacket();
-        size_t readPacket(std::vector<uint8_t>& buf);
-        bool isBusy();
+        virtual bool setup();
+        virtual size_t sendPacket(std::vector<uint8_t> buf);
+        virtual std::vector<uint8_t> readPacket();
+        virtual size_t readPacket(std::vector<uint8_t>& buf);
+        virtual bool isBusy();
 };
