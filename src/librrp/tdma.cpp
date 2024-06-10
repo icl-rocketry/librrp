@@ -2,7 +2,7 @@
 #include <libriccore/riccorelogging.h>
 
 
-TDMA::TDMA(SPIClass& spi, int cs,int reset, int dio,Types::CoreTypes::SystemStatus_t& systemstatus, RnpNetworkManager& networkmanager, uint8_t id, std::string name):
+TDMA::TDMA(Transport &transport, Types::CoreTypes::SystemStatus_t &systemstatus, RnpNetworkManager& networkmanager, uint8_t id = 2, std::string name = "TDMA", bool sim):
 RnpInterface(id,name),
 _config(defaultConfig),
 _transport(transport),
@@ -10,7 +10,8 @@ _systemstatus(systemstatus),
 _currentSendBufferSize(0),
 _txDone(true),
 _received(false),
-_networkmanager(networkmanager)
+_networkmanager(networkmanager),
+_sim(false)
 {
     _info.MTU = 256;
     _info.sendBufferSize = 2048;
@@ -19,9 +20,10 @@ _networkmanager(networkmanager)
 
 void TDMA::setup(){
     
-    _transport.setup();
-
-    if(!_systemstatus.flagSetOr(SYSTEM_FLAG::ERROR_TDMA)){
+    if (!_transport.setup()){
+        _systemstatus.newFlag(SYSTEM_FLAG::ERROR_TDMA);
+    }
+    else{
         calcTimewindowDuration();
         registeredNodes.push_back(_networkmanager.getAddress());    // add own address to list
         timewindows = registeredNodes.size() + 1;                   // n+1 timewindows
@@ -33,8 +35,7 @@ void TDMA::update(){
 
     if (micros() - (timeMovedTimewindow + networkTimeShift) >= timewindowDuration){
         currTimewindow = (currTimewindow + 1) % timewindows;
-        // RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>(std::to_string(currTimewindow));
-        RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Number of registered nodes: " + std::to_string(registeredNodes.size()));
+        log("Number of registered nodes: " + std::to_string(registeredNodes.size()));
         timeMovedTimewindow = micros();
 
         packetSent = false;
@@ -49,7 +50,7 @@ void TDMA::update(){
         {
             nodes += (std::to_string(n) + ","); 
         }
-        RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Nodes: " + nodes);
+        log("Nodes: " + nodes);
         pTime = millis();
     }
 
@@ -82,7 +83,7 @@ void TDMA::discovery(){
 
 
         case DISCOVERY_PHASE::ENTRY: {
-            RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Entered Discovery");
+            log("Entered Discovery");
             timeEnteredDiscovery = micros();                    // timestamp entry
             currentDiscoveryPhase = DISCOVERY_PHASE::SNIFFING;  // transition to next phase
             break;
@@ -96,7 +97,7 @@ void TDMA::discovery(){
             }
 
             if (_received){
-                RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Network detected");
+                log("Network detected");
                 currentDiscoveryPhase = DISCOVERY_PHASE::SYNCING;       // transition to network syncing
             }
             break;
@@ -104,7 +105,7 @@ void TDMA::discovery(){
         
 
         case DISCOVERY_PHASE::INIT_NETWORK: {
-            RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Initialising network");
+            log("Initialising network");
             initNetwork();
             currentDiscoveryPhase = DISCOVERY_PHASE::EXIT;              // transition to exit phase
             break;
@@ -122,8 +123,8 @@ void TDMA::discovery(){
             if(currTimewindow == txTimewindow){
 
                 generateTDMAHeader(joinRequest, PacketType::JOINREQUEST, packetSource);
-                if(_transport.sendBytes(joinRequest) > 0){                                      // bytes written successfully
-                    RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Join request sent");
+                if(_transport.sendPacket(joinRequest) > 0){                                      // bytes written successfully
+                    log("Join request sent");
                     timeJoinRequestSent = micros();
                     currentDiscoveryPhase = DISCOVERY_PHASE::JOIN_REQUEST_RESPONSE; // transition to waiting for response
                 }
@@ -134,24 +135,24 @@ void TDMA::discovery(){
 
         case DISCOVERY_PHASE::JOIN_REQUEST_RESPONSE: {
 
-            _transport.receiveBytes();        // scan for response
+            getPacket();        // scan for response
 
             if (_received){
-                RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Received something: " + std::to_string(receivedPacketType) + ", " + std::to_string(packetDest) + ", " + std::to_string(_networkmanager.getAddress()));
+                log("Received something: " + std::to_string(receivedPacketType) + ", " + std::to_string(packetDest) + ", " + std::to_string(_networkmanager.getAddress()));
             }
 
             if(_received && receivedPacketType == PacketType::ACK && packetDest == _networkmanager.getAddress()){
-                RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Joined network");
+                log("Joined network");
 
                 try{
                     updateRegisteredNodes(_networkmanager.getAddress());
                 }catch (std::exception& e){
-                    RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("ERROR updating reg nodes list: " + std::string(e.what()));
+                    log("ERROR updating reg nodes list: " + std::string(e.what()));
                 }
                 try {
                     updateRegisteredNodes(packetSource);
                 }catch (std::exception& e){
-                    RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("ERROR updating reg nodes list: " + std::string(e.what()));
+                    log("ERROR updating reg nodes list: " + std::string(e.what()));
                 }
                 //registeredNodes.push_back(_networkmanager.getAddress()); // add self to list
                 //registeredNodes.push_back(packetDest);       // maybe should not add to the registered nodes list
@@ -160,17 +161,17 @@ void TDMA::discovery(){
             }
 
             else if(_received && receivedPacketType == PacketType::NACK && packetDest == _networkmanager.getAddress()){  
-                RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Node joined before");
+                log("Node joined before");
                 txTimewindow = packetInfo;
                 try{
                     updateRegisteredNodes(_networkmanager.getAddress());
                 }catch (std::exception& e){
-                    RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("ERROR updating reg nodes list: " + std::string(e.what()));
+                    log("ERROR updating reg nodes list: " + std::string(e.what()));
                 }
                 try {
                     updateRegisteredNodes(packetSource);
                 }catch (std::exception& e){
-                    RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("ERROR updating reg nodes list: " + std::string(e.what()));
+                    log("ERROR updating reg nodes list: " + std::string(e.what()));
                 }
                 //registeredNodes.push_back(_networkmanager.getAddress()); // add self to list
                 //registeredNodes.push_back(packetDest);       // maybe should not add to the registered nodes list
@@ -186,14 +187,14 @@ void TDMA::discovery(){
 
         
         case DISCOVERY_PHASE::EXIT: {
-            RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Exiting discovery");
+            log("Exiting discovery");
             currentMode = TDMA_MODE::TRANSMIT;      // to exit out of discovery, assign any other mode other than discovery
             break;
         }
 
 
         default: {
-            RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("ERROR: Unknown discovery phase");
+            log("ERROR: Unknown discovery phase");
             break;
         }
 
@@ -275,22 +276,22 @@ void TDMA::tx(){
             txWindowDone = true;
         }
         if(!packetSent){
-            bytes_written = _transport.sendBytes(_sendBuffer.front());  // send from front of buffer -> sets packetSent to true?
+            bytes_written = _transport.sendPacket(_sendBuffer.front());  // send from front of buffer -> sets packetSent to true?
             if (bytes_written){
-                RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("RNP packet sent");
+                log("RNP packet sent");
                 countsNoAck ++;  // just trust me bro, it makes sense
                 countsNoTx = 0; 
             }
         }
         else{                   // packet has been sent
-            RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Waiting for Ack");
+            log("Waiting for Ack");
             getPacket();        // scan for acks
             if (_received)
             {
-                RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("received something: " +  std::to_string(receivedPacketType));
+                log("received something: " +  std::to_string(receivedPacketType));
             }
             if (_received && receivedPacketType == PacketType::ACK){ // packet got acked
-                RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("got Ack");
+                log("got Ack");
                 uint8_t popped_packet_size = sizeof(_sendBuffer.back());
                 _sendBuffer.pop();      // remove packet from send queue
                 _currentSendBufferSize -= popped_packet_size;
@@ -303,10 +304,9 @@ void TDMA::tx(){
     else{                           // buffer empty
 
         if (countsNoTx >= maxCountsNoTx){        // node didn't transmit in a long time
-            //RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("transmit heartbeat");
             std::vector<uint8_t> heartbeatPacket(tdmaHeaderSize);
             generateTDMAHeader(heartbeatPacket, PacketType::HEARTBEAT, 0);
-            _transport.sendBytes(heartbeatPacket);  // send skipping buffer
+            _transport.sendPacket(heartbeatPacket);  // send skipping buffer
             countsNoTx = 0;
             txWindowDone = true;
         }
@@ -325,7 +325,7 @@ void TDMA::rx(){
 
     if(_received){
         networkTimeShift = timeMovedTimewindow - (timePacketReceived - static_cast<uint64_t>(calcPacketToF(packetSize)*1e6f));   //resyncing
-        RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>(std::to_string(static_cast<uint64_t>(calcPacketToF(packetSize)*1e6f)) + " vs " + std::to_string(timewindowDuration));
+        log(std::to_string(static_cast<uint64_t>(calcPacketToF(packetSize)*1e6f)) + " vs " + std::to_string(timewindowDuration));
 
         std::vector<uint8_t> ackPacket(tdmaHeaderSize);     // initialising ack packet
 
@@ -333,7 +333,7 @@ void TDMA::rx(){
 
             case PacketType::JOINREQUEST: {                             // handling join request
                 
-                RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Received join request");
+                log("Received join request");
 
                 auto it = find(registeredNodes.begin(), registeredNodes.end(), packetSource);
 
@@ -342,13 +342,13 @@ void TDMA::rx(){
                     timewindows = registeredNodes.size()+1;             // update number of timewindows
      
                     generateTDMAHeader(ackPacket, PacketType::ACK, packetSource);     //ack join request
-                    _transport.sendBytes(ackPacket);            
+                    _transport.sendPacket(ackPacket);            
                     rxWindowDone = true;
                 }
                 else{                                                   // node has already registered
                     uint8_t requesterTxTimewindow = static_cast<uint8_t>(it-registeredNodes.begin());
                     generateTDMAHeader(ackPacket, PacketType::NACK, packetSource, requesterTxTimewindow); // nack join request
-                    _transport.sendBytes(ackPacket);            
+                    _transport.sendPacket(ackPacket);            
                     rxWindowDone = true;               
                 }
                 break;
@@ -358,8 +358,8 @@ void TDMA::rx(){
             case PacketType::NORMAL: {                                  // handling RNP packet
 
                 generateTDMAHeader(ackPacket, PacketType::ACK, packetSource);
-                _transport.sendBytes(ackPacket);
-                RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Radio receive");
+                _transport.sendPacket(ackPacket);
+                log("Radio receive");
                 rxWindowDone = true; 
                 break; 
             }
@@ -370,7 +370,7 @@ void TDMA::rx(){
             }
 
             default: {                                                  // handling other packet
-                RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Received unexpected packet type: " + std::to_string(receivedPacketType));
+                log("Received unexpected packet type: " + std::to_string(receivedPacketType));
                 rxWindowDone = true;
                 break;
             }
@@ -434,14 +434,14 @@ void TDMA::updateRegisteredNodes(uint8_t rnp_node){
     }
     else{
         registeredNodes.push_back(rnp_node);
-        RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("RNP node " + std::to_string(rnp_node) + " added to list");
+        log("RNP node " + std::to_string(rnp_node) + " added to list");
     }
 }
 
 
 void TDMA::getPacket(){
-    if (_transport.readPacket())
-        RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Radio receive");
+    if (_transport.readPacket() > 0){
+        log("Radio receive");
         packetSize = size;
         _received=true; 
 
@@ -455,8 +455,8 @@ void TDMA::getPacket(){
             bytestring += e;
         }
 
-        RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("IPacket Size: " + std::to_string(data.size()) );
-        RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("IPacket: " + bytestring );
+        log("IPacket Size: " + std::to_string(data.size()) );
+        log("IPacket: " + bytestring );
 
         //unpacking TDMA header
         try{
@@ -464,7 +464,7 @@ void TDMA::getPacket(){
         }
         catch (std::exception& e)
         {
-            RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Error: " + std::string(e.what()));
+            log("TDMA Error: " + std::string(e.what()));
             return;
         }
 
@@ -473,16 +473,10 @@ void TDMA::getPacket(){
         {
             bytestring += e;
         }
-        RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Packet Size: " + std::to_string(data.size()) );
-        RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Packet: " + bytestring );
+        log("Packet Size: " + std::to_string(data.size()) );
+        log("Packet: " + bytestring );
 
-        RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>(std::to_string(receivedPacketType));
-
-
-        // TODO: fix this shit
-        // if (currentMode != TDMA_MODE::DISCOVERY && packetRegNodes - static_cast<uint8_t>(registeredNodes.size()) > 0){  //local node list is shorter
-        //     registeredNodes.resize(packetRegNodes);
-        // }        
+        log(std::to_string(receivedPacketType));      
 
         if (data.size() > 0){     // packet still has smthing left in it
 
@@ -497,7 +491,7 @@ void TDMA::getPacket(){
             }
             catch (std::exception& e)
             {
-                RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Deserialization error: " + std::string(e.what()));
+                log("Deserialization error: " + std::string(e.what()));
                 return;
             }
 
@@ -522,7 +516,7 @@ void TDMA::getPacket(){
 
 size_t TDMA::send(std::vector<uint8_t> &data){
     if (loraRadio.beginPacket()){
-        RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Radio Send");
+        log("Radio Send");
         loraRadio.write(data.data(), data.size());
         loraRadio.endPacket(true); // asynchronous send 
         //_txDone = false;
@@ -551,4 +545,14 @@ void TDMA::setConfig(RadioConfig config)
 {
     _config = config;
     _transport.setConfig(_config);
+}
+
+void TDMA::log(std::string logMessage)
+{
+    if (_sim){
+        std::cout << message << "\n";
+    }
+    else{
+        RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>(logMessage);
+    }
 }

@@ -1,0 +1,2 @@
+C:\MinGW\bin\ar.exe qc C:\Users\artem\Documents\Avionics\librrp\lib\liblibrrp.a CMakeFiles/librrp.dir/librrp/sim.cpp.obj CMakeFiles/librrp.dir/librrp/tdma.cpp.obj
+C:\MinGW\bin\ranlib.exe C:\Users\artem\Documents\Avionics\librrp\lib\liblibrrp.a

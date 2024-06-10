@@ -4,9 +4,7 @@
 #include <vector>
 #include <string>
 #include <queue>
-//arduino + esp32 
-#include <Arduino.h>
-#include <SPI.h>
+#include <cstddef>
 
 //Ric libraries
 #include <libriccore/riccorelogging.h>
@@ -81,7 +79,7 @@ class TDMA : public RnpInterface
 public:
 
     TDMA(Transport &transport, Types::CoreTypes::SystemStatus_t &systemstatus, 
-            RnpNetworkManager& networkmanager, uint8_t id = 2, std::string name = "TDMA");
+            RnpNetworkManager& networkmanager, uint8_t id = 2, std::string name = "TDMA", bool sim);
 
     void setup() override;
     void setConfig(RadioConfig config);
@@ -102,7 +100,9 @@ private:
     bool _txDone;
     bool _received = false;
     RadioConfig _config;
+    bool _sim;
 
+    void log(std::string logMessage);
 
     // TOP LEVEL TDMA DRIVER
     

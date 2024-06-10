@@ -11,28 +11,31 @@
 #include <fstream>
 
 #include <librnp/rnp_networkmanager.h>
-
-
-
-
+#include "sim.h"
+#include "tdma.h"
 
 
 int main()
 {
-    using MessagePacket = MessagePacket_Base<10,10>;
-    MessagePacket msgp("Test Packet!");
-    std::vector<uint8_t> sermsgp;
-    msgp.serialize(sermsgp);
+    std::deque<std::vector<uint8_t>> exchangeDeque;
+    std::atomic<uint8_t> counter = 0;
 
-    for (auto elem : sermsgp){
-        std::cout<<std::hex<<(int)elem<<",";
+    uint8_t numNodes = 1;
+    std::vector<Sim> simTransports;
+    std::vector<TDMA> tdmaNodes;
+
+    for (int i = 0; i < numNodes; ++i) {
+        simTransports.emplace_back(&exchangeDeque, &counter, numNodes);
+        tdmaNodes.emplace_back(&simTransports[i], systemstatus, networkmanager, true);
     }
 
-    RnpPacketSerialized newpacket(sermsgp);
+    for (auto& node : tdmaNodes) {
+        node.setup()
+    }
 
-    MessagePacket decoded(newpacket);
-    std::cout<<RnpHeader::print(decoded.header).str()<<std::endl;
-    std::cout<<decoded._msg<<std::endl;
+    for (;;) {
+        node.update();
+    }
 
     return 0;
 }
