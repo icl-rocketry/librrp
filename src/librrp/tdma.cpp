@@ -1,42 +1,44 @@
 #include "tdma.h"
+#include <cmath>
 #include <libriccore/riccorelogging.h>
 
-
-TDMA::TDMA(Transport &transport, Types::CoreTypes::SystemStatus_t &systemstatus, RnpNetworkManager& networkmanager, uint8_t id = 2, std::string name = "TDMA", bool sim):
+template <typename Transport>
+TDMA<Transport>::TDMA(Transport &transport, RnpNetworkManager& networkmanager, uint8_t id, std::string name, bool sim):
 RnpInterface(id,name),
 _config(defaultConfig),
 _transport(transport),
-_systemstatus(systemstatus),
 _currentSendBufferSize(0),
 _txDone(true),
 _received(false),
 _networkmanager(networkmanager),
-_sim(false)
+_sim(sim)
 {
     _info.MTU = 256;
     _info.sendBufferSize = 2048;
     _info.mode=currentMode;
 };
 
-void TDMA::setup(){
+template <typename Transport>
+void TDMA<Transport>::setup(){
     
     if (!_transport.setup()){
-        _systemstatus.newFlag(SYSTEM_FLAG::ERROR_TDMA);
+        // _systemstatus.newFlag(SYSTEM_FLAG::ERROR_TDMA);
     }
     else{
         calcTimewindowDuration();
         registeredNodes.push_back(_networkmanager.getAddress());    // add own address to list
         timewindows = registeredNodes.size() + 1;                   // n+1 timewindows
-        timeMovedTimewindow = micros();
+        timeMovedTimewindow = millis();
     }
 };
 
-void TDMA::update(){
+template <typename Transport>
+void TDMA<Transport>::update(){
 
-    if (micros() - (timeMovedTimewindow + networkTimeShift) >= timewindowDuration){
+    if (millis() - (timeMovedTimewindow + networkTimeShift) >= timewindowDuration){
         currTimewindow = (currTimewindow + 1) % timewindows;
         log("Number of registered nodes: " + std::to_string(registeredNodes.size()));
-        timeMovedTimewindow = micros();
+        timeMovedTimewindow = millis();
 
         packetSent = false;
         txWindowDone = false;
@@ -74,8 +76,8 @@ void TDMA::update(){
     }
 };
 
-
-void TDMA::discovery(){
+template <typename Transport>
+void TDMA<Transport>::discovery(){
 
     std::vector<uint8_t> joinRequest(tdmaHeaderSize);   // variable declaration apparently needs to be outside switch case :(
 
@@ -84,7 +86,7 @@ void TDMA::discovery(){
 
         case DISCOVERY_PHASE::ENTRY: {
             log("Entered Discovery");
-            timeEnteredDiscovery = micros();                    // timestamp entry
+            timeEnteredDiscovery = millis();                    // timestamp entry
             currentDiscoveryPhase = DISCOVERY_PHASE::SNIFFING;  // transition to next phase
             break;
         }
@@ -92,7 +94,7 @@ void TDMA::discovery(){
         case DISCOVERY_PHASE::SNIFFING: {
             getPacket();        // scan for packets
 
-            if (micros() - timeEnteredDiscovery > discoveryTimeout){
+            if (millis() - timeEnteredDiscovery > discoveryTimeout){
                 currentDiscoveryPhase = DISCOVERY_PHASE::INIT_NETWORK;  // transition to network initialisation
             }
 
@@ -125,7 +127,7 @@ void TDMA::discovery(){
                 generateTDMAHeader(joinRequest, PacketType::JOINREQUEST, packetSource);
                 if(_transport.sendPacket(joinRequest) > 0){                                      // bytes written successfully
                     log("Join request sent");
-                    timeJoinRequestSent = micros();
+                    timeJoinRequestSent = millis();
                     currentDiscoveryPhase = DISCOVERY_PHASE::JOIN_REQUEST_RESPONSE; // transition to waiting for response
                 }
             } 
@@ -179,7 +181,7 @@ void TDMA::discovery(){
                 currentDiscoveryPhase = DISCOVERY_PHASE::EXIT;
             }
 
-            if (micros() - timeJoinRequestSent > joinRequestExpiryTime || (_received && receivedPacketType == PacketType::HEARTBEAT)){       // request expired
+            if (millis() - timeJoinRequestSent > joinRequestExpiryTime || (_received && receivedPacketType == PacketType::HEARTBEAT)){       // request expired
                 currentDiscoveryPhase = DISCOVERY_PHASE::JOIN_REQUEST;  // try again
             }
             break;
@@ -202,8 +204,8 @@ void TDMA::discovery(){
 
 }
 
-
-void TDMA::sync(){
+template <typename Transport>
+void TDMA<Transport>::sync(){
     networkTimeShift = timeMovedTimewindow - (timePacketReceived - static_cast<uint64_t>(calcPacketToF(packetSize)*1e6f));   //resyncing
     
     currTimewindow = packetTimewindow;    // sync local current timewindow to network
@@ -212,28 +214,30 @@ void TDMA::sync(){
     synced = true;                        // syncing complete
 }
 
-
-
-void TDMA::initNetwork(){
+template <typename Transport>
+void TDMA<Transport>::initNetwork(){
     timewindows = registeredNodes.size() + 1;    //n+1 timewindows
     txTimewindow = 0;  //of this node
     currTimewindow = txTimewindow;
-    timeMovedTimewindow = micros();
+    timeMovedTimewindow = millis();
 }
 
-void TDMA::generateTDMAHeader(std::vector<uint8_t> &TDMAHeader, PacketType packettype, uint8_t destinationNode){
+template <typename Transport>
+void TDMA<Transport>::generateTDMAHeader(std::vector<uint8_t> &TDMAHeader, PacketType packettype, uint8_t destinationNode){
     TDMAHeader = {static_cast<uint8_t>(packettype), static_cast<uint8_t>(registeredNodes.size()), 
                     currTimewindow, static_cast<uint8_t>(_networkmanager.getAddress()), 
                     static_cast<uint8_t>(destinationNode), static_cast<uint8_t>(255)};
 }
 
-void TDMA::generateTDMAHeader(std::vector<uint8_t> &TDMAHeader, PacketType packettype, uint8_t destinationNode, uint8_t info){
+template <typename Transport>
+void TDMA<Transport>::generateTDMAHeader(std::vector<uint8_t> &TDMAHeader, PacketType packettype, uint8_t destinationNode, uint8_t info){
     TDMAHeader = {static_cast<uint8_t>(packettype), static_cast<uint8_t>(registeredNodes.size()), 
                     currTimewindow, static_cast<uint8_t>(_networkmanager.getAddress()), 
                     static_cast<uint8_t>(destinationNode), info};
 }
 
-void TDMA::unpackTDMAHeader(std::vector<uint8_t> &packet){
+template <typename Transport>
+void TDMA<Transport>::unpackTDMAHeader(std::vector<uint8_t> &packet){
     uint8_t initial_size = packet.size();
 
     //! This is kinda slow maybe to an inital copy first?
@@ -264,7 +268,8 @@ void TDMA::unpackTDMAHeader(std::vector<uint8_t> &packet){
 
 }
 
-void TDMA::tx(){
+template <typename Transport>
+void TDMA<Transport>::tx(){
 
     if(_sendBuffer.size() > 0){    //buffer not empty
 
@@ -276,7 +281,7 @@ void TDMA::tx(){
             txWindowDone = true;
         }
         if(!packetSent){
-            bytes_written = _transport.sendPacket(_sendBuffer.front());  // send from front of buffer -> sets packetSent to true?
+            uint8_t bytes_written = _transport.sendPacket(_sendBuffer.front());  // send from front of buffer -> sets packetSent to true?
             if (bytes_written){
                 log("RNP packet sent");
                 countsNoAck ++;  // just trust me bro, it makes sense
@@ -319,7 +324,8 @@ void TDMA::tx(){
 
 }
 
-void TDMA::rx(){
+template <typename Transport>
+void TDMA<Transport>::rx(){
 
     _transport.receiveBytes();    // scan for packets
 
@@ -379,17 +385,18 @@ void TDMA::rx(){
     }
 }
 
-
-void TDMA::calcTimewindowDuration(){
+template <typename Transport>
+void TDMA<Transport>::calcTimewindowDuration(){
     float maxTframe = 2;                 //assuming 2 seconds
     float clock_drift = 2E-5;            //s/s
     float Tg = maxTframe*clock_drift;    //guard time   
     float ff = 1.1;                        //magic fudge factor
-    timewindowDuration = ff*(calcPacketToF(_config.max_payload_length) + calcPacketToF(_config.max_ack_length) + Tg)*1e6f;
+    timewindowDuration = ff*(calcPacketToF(_config.max_payload_length) + calcPacketToF(_config.max_ack_length) + Tg)*1e3f;  // in ms
 }
 
-float TDMA::calcPacketToF(int Lpayload){
-    float Rs = _config.bandwidth/pow(2,_config.spreading_factor);
+template <typename Transport>
+float TDMA<Transport>::calcPacketToF(int Lpayload){
+    float Rs = _config.bandwidth/std::pow(2,_config.spreading_factor);
     float CR = _config.cr_denominator - 4;
     float Tsym = 1/Rs;
     float Tpreamble = (_config.preamble_length + 4.25)*Tsym;
@@ -397,8 +404,8 @@ float TDMA::calcPacketToF(int Lpayload){
     return Tpreamble + Tpayload;
 }
 
-
-void TDMA::sendPacket(RnpPacket& data)
+template <typename Transport>
+void TDMA<Transport>::sendPacket(RnpPacket& data)
 {
     const size_t dataSize = data.header.size() + data.header.packet_len;
     //! DATA SIZE NOT updated with tdma header length
@@ -409,7 +416,8 @@ void TDMA::sendPacket(RnpPacket& data)
         return;
     }
     if (dataSize + _currentSendBufferSize > _info.sendBufferSize){
-        _systemstatus.newFlag(SYSTEM_FLAG::ERROR_LORA," Lora Send Buffer Overflow!");
+        // _systemstatus.newFlag(SYSTEM_FLAG::ERROR_LORA," Lora Send Buffer Overflow!");
+        log("Lora Send Buffer Overflow!");
         ++_info.txerror;
         _info.sendBufferOverflow = true;
         return;
@@ -426,7 +434,8 @@ void TDMA::sendPacket(RnpPacket& data)
 
 }
 
-void TDMA::updateRegisteredNodes(uint8_t rnp_node){
+template <typename Transport>
+void TDMA<Transport>::updateRegisteredNodes(uint8_t rnp_node){
     auto it = find(registeredNodes.begin(), registeredNodes.end(), rnp_node);
     if (it != registeredNodes.end()){
         throw std::runtime_error("RNP node " + std::to_string(rnp_node) + " already exists in list");
@@ -438,16 +447,18 @@ void TDMA::updateRegisteredNodes(uint8_t rnp_node){
     }
 }
 
+template <typename Transport>
+void TDMA<Transport>::getPacket(){
 
-void TDMA::getPacket(){
+    size_t packetSize = _transport.readPacket();
+
     if (_transport.readPacket() > 0){
         log("Radio receive");
-        packetSize = size;
         _received=true; 
 
-        timePacketReceived = micros();
+        timePacketReceived = millis();
         std::vector<uint8_t> data(packetSize); 
-        loraRadio.readBytes(data.data(),packetSize);
+        _transport.readPacket(data.data());
 
         std::string bytestring;
         for (auto e : data)
@@ -513,44 +524,27 @@ void TDMA::getPacket(){
     }
 }
 
-
-size_t TDMA::send(std::vector<uint8_t> &data){
-    if (loraRadio.beginPacket()){
-        log("Radio Send");
-        loraRadio.write(data.data(), data.size());
-        loraRadio.endPacket(true); // asynchronous send 
-        //_txDone = false;
-        //_info.prevTimeSent = millis();
-        packetSent = true;
-        _received = false;
-        acked = false;
-        if (static_cast<PacketType>(data.front()) == PacketType::NORMAL){
-            //RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Radio RNP packet Send");
-        }
-        return data.size();
-    }else{
-        return 0;
-    }
-}
-
-
-const RnpInterfaceInfo* TDMA::getInfo()
+template <typename Transport>
+const RnpInterfaceInfo* TDMA<Transport>::getInfo()
 {
-    return transport.getInfo();
+    return _transport.getInfo();
 };
 
-const RadioConfig& TDMA::getConfig(){return _config;};
+template <typename Transport>
+const RadioConfig& TDMA<Transport>::getConfig(){return _config;};
 
-void TDMA::setConfig(RadioConfig config)
+template <typename Transport>
+void TDMA<Transport>::setConfig(RadioConfig config)
 {
     _config = config;
     _transport.setConfig(_config);
 }
 
-void TDMA::log(std::string logMessage)
+template <typename Transport>
+void TDMA<Transport>::log(std::string logMessage)
 {
     if (_sim){
-        std::cout << message << "\n";
+        std::cout << logMessage << "\n";
     }
     else{
         RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>(logMessage);

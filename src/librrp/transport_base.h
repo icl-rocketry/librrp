@@ -4,7 +4,7 @@
 #include <cstddef>
 
 
-class Transport_Base
+class TransportBase
 {
     public:
         virtual bool setup();

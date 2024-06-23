@@ -12,11 +12,12 @@
 #include <librnp/rnp_packet.h>
 #include <librnp/rnp_networkmanager.h>
 
-// /lib
-#include <LoRa.h>
 
-#include <Config/types.h>
-#include <Config/systemflags_config.h>
+#ifdef LIBRICCORE_UNIX
+    #include <libriccore/platform/unix/millis_stub.h>
+#else
+    #include <librricoree/platform/esp32/millis.h>
+#endif  
 
 
 struct RadioConfig
@@ -78,8 +79,7 @@ class TDMA : public RnpInterface
 {
 public:
 
-    TDMA(Transport &transport, Types::CoreTypes::SystemStatus_t &systemstatus, 
-            RnpNetworkManager& networkmanager, uint8_t id = 2, std::string name = "TDMA", bool sim);
+    TDMA(Transport &transport, RnpNetworkManager& networkmanager, uint8_t id = 2, std::string name = "TDMA", bool sim = false);
 
     void setup() override;
     void setConfig(RadioConfig config);
@@ -91,7 +91,6 @@ public:
 
 private:
     Transport& _transport;
-    Types::CoreTypes::SystemStatus_t& _systemstatus;
     RnpNetworkManager &_networkmanager;
 
 
@@ -101,6 +100,8 @@ private:
     bool _received = false;
     RadioConfig _config;
     bool _sim;
+
+    uint32_t pTime = 0;
 
     void log(std::string logMessage);
 
@@ -121,6 +122,8 @@ private:
     void unpackTDMAHeader(std::vector<uint8_t> &packet);
     void sync();
     void updateRegisteredNodes(uint8_t rnp_node);
+
+    void getPacket();
 
     std::queue<std::vector<uint8_t>> _sendBuffer; 
 
@@ -151,7 +154,7 @@ private:
     uint8_t packetRegNodes;
     uint8_t packetTimewindow;
     uint8_t packetInfo;
-    int packetSize;
+    size_t packetSize;
 
     bool enteredDiscovery = false;
     bool joinRequestSent = false;
