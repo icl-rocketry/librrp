@@ -18,12 +18,6 @@
 
 int main()
 {
-    uint8_t numNodes = 1;
-
-    SimTransport transport1;
-    // RnpNetworkManager networkmanager1(0,NODETYPE::LEAF,true,200);
-    // TDMA<SimTransport> TDMAnode1(transport1, networkmanager1, 2, "TDMA", true);
-    // TDMAnode1.setup();
-
+    std::cout << "hello " <<std::endl;
     return 0;
 }

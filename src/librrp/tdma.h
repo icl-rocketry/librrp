@@ -103,8 +103,6 @@ private:
 
     uint32_t pTime = 0;
 
-    void log(std::string logMessage);
-
     // TOP LEVEL TDMA DRIVER
     
     void discovery();

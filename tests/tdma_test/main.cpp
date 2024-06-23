@@ -10,10 +10,26 @@
 
 #include <fstream>
 
+// librrp
+#include "../../src/librrp/sim_transport.h"
+#include "../../src/librrp/tdma.h"
+
+//librnp
+#include <librnp/rnp_networkmanager.h>
 
 
 int main()
 {
+    SimTransport transport1;
+    RnpNetworkManager networkmanager;
+    TDMA<SimTransport> node1(transport1, networkmanager);
+
+    node1.setup();
+
+
+    for (;;) {
+        node1.update();
+    }
 
     return 0;
 }

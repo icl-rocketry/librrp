@@ -1,2 +1,0 @@
-/usr/bin/ar qc /home/as8520/librrp/lib/liblibrrp.a CMakeFiles/librrp.dir/librrp/sim_transport.cpp.o CMakeFiles/librrp.dir/librrp/tdma.cpp.o CMakeFiles/librrp.dir/__/lib/libriccore/src/libriccore/platform/unix/riccorethread.cpp.o
-/usr/bin/ranlib /home/as8520/librrp/lib/liblibrrp.a

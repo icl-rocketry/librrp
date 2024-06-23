@@ -1,5 +1,13 @@
 #include "sim_transport.h"
 
+bool SimTransport::setup(){
+    return true;
+}
+
+bool SimTransport::isBusy(){
+    return false;
+}
+
 size_t SimTransport::sendPacket(std::vector<uint8_t> buf){
     std::lock_guard<std::mutex> lock(_mtx);
     for (SimTransport* node : _nodes){

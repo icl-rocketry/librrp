@@ -10,7 +10,8 @@
 class SimTransport : public TransportBase {
 
     public:
-        SimTransport(){};
+        SimTransport() = default;
+        ~SimTransport() override = default;
 
         bool setup() override;
         size_t sendPacket(std::vector<uint8_t> buf) override;
@@ -18,7 +19,7 @@ class SimTransport : public TransportBase {
         bool isBusy() override;
 
         void setNodesList(std::vector<SimTransport*> nodes);
-        void pushToRxBuffer(std::vector<uint8_t> buf);
+        void pushToRxBuffer(std::vector<uint8_t> buf);          
 
     private:
 
