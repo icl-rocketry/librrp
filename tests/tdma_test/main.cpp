@@ -11,8 +11,8 @@
 #include <fstream>
 
 // librrp
-#include "../../src/librrp/sim_transport.h"
-#include "../../src/librrp/tdma.h"
+#include <librrp/sim_transport.h>
+#include <librrp/tdma.h>
 
 //librnp
 #include <librnp/rnp_networkmanager.h>

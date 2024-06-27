@@ -30,3 +30,10 @@
 *.exe
 *.out
 *.app
+
+# exclude build and bin
+build/*
+bin/*
+
+.vscode
+

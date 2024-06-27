@@ -10,14 +10,7 @@ add_compile_options(-Wpedantic)
 
 set(LOCAL ON)
 
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../.. ${CMAKE_CURRENT_SOURCE_DIR}/../../build)
 
-# #hack to get librnp to compile properly, need to convert them to cmake libraries 
-# file(GLOB_RECURSE LIBRNP_SRC ${CMAKE_CURRENT_SOURCE_DIR}/../../lib/librnp/src/*.cpp)
-
-# message(STATUS ${CMAKE_CURRENT_SOURCE_DIR}../../)
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../lib/librnp/ ${CMAKE_CURRENT_SOURCE_DIR}/../../lib/librnp/bin)
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../lib/libriccore/ ${CMAKE_CURRENT_SOURCE_DIR}/../../lib/libriccore/bin)
 
 
 # add_executable(libriccore_fsm_test ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp ${LIBRNP_SRC})
