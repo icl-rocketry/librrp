@@ -62,6 +62,9 @@
         "stop_token": "cpp",
         "cinttypes": "cpp",
         "variant": "cpp",
-        "semaphore": "cpp"
+        "semaphore": "cpp",
+        "text_encoding": "cpp",
+        "charconv": "cpp",
+        "format": "cpp"
     }
 }

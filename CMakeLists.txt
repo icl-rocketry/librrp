@@ -13,7 +13,6 @@ if (ESP_PLATFORM)
     #link the orignal cmake librnp library to the component library 
     target_link_libraries(${COMPONENT_LIB} INTERFACE librrp)
     return()
-
 endif()
 
 
@@ -31,14 +30,15 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 # Add source directory
 add_subdirectory(src)
 
+# Add lib subdirectories to build deps
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/lib/librnp)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/lib/libriccore)
+target_link_libraries(librrp PRIVATE libriccore)
+target_link_libraries(librrp PRIVATE librnp)
+
 # Add tests
 option(TESTS "enable building of tests" OFF)
 if (TESTS)
     add_subdirectory(tests)
-    #add lib subdirectories to build deps
-    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/lib/librnp)
-    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/lib/libriccore)
-    target_link_libraries(librrp PRIVATE libriccore)
-    target_link_libraries(librrp PRIVATE librnp)
-    
+    message(STATUS "Building tests")
 endif()
