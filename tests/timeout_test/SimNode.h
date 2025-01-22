@@ -4,16 +4,21 @@
 #include <librnp/default_packets/simplecommandpacket.h>
 
 //librrp
-#include <librrp/physical/sim_physical_layer.h>
+#include <librrp/physical/lora_sim_physical_layer.h>
 #include <librrp/datalink/turn_timeout.h>
 
 // libriccore
 #include <libriccore/platform/millis.h>
 
+#include <mutex>
+#include <memory>
+
 template <typename DataLinkProtocol>
 class SimNode {
     public:
-        SimNode() : radio(simphysicallayer) {};
+        SimNode(std::shared_ptr<std::mutex> mtx, float frequency, float bandwidth, uint8_t spreadingFactor)
+            : simphysicallayer(mtx, frequency, bandwidth, spreadingFactor),
+            radio(simphysicallayer) {}
         
         void setup(){
             
@@ -36,13 +41,13 @@ class SimNode {
             }
         }
 
-        SimPhysicalLayer* getPhysicalLayer(){
+        LoRaSimPhysicalLayer* getPhysicalLayer(){
             return &simphysicallayer;
         }
 
     private: 
         RnpNetworkManager networkmanager;
-        SimPhysicalLayer simphysicallayer;
+        LoRaSimPhysicalLayer simphysicallayer;
         DataLinkProtocol radio;
 
         uint64_t m_timeLastPacketPushed = 0;

@@ -15,9 +15,8 @@
 class SimPhysicalLayer : public PhysicalLayerBase {
 
     public:
-        SimPhysicalLayer() = default;
+        explicit SimPhysicalLayer(std::shared_ptr<std::mutex> mtx) : m_mtx(mtx) {}        
         ~SimPhysicalLayer() override = default;
-
         bool setup() override;
         size_t sendPacket(std::vector<uint8_t> data) override;
         size_t readPacket(std::vector<uint8_t>& data) override;
@@ -27,9 +26,9 @@ class SimPhysicalLayer : public PhysicalLayerBase {
         void setNodesList(std::vector<SimPhysicalLayer*> nodes);
         void pushToRxBuffer(std::vector<uint8_t> data);          
 
-    private:
+    protected:
 
         std::queue<std::vector<uint8_t>> rxBuffer;
         std::vector<SimPhysicalLayer*> m_nodes;
-        std::mutex m_mtx;
+        std::shared_ptr<std::mutex> m_mtx;
 };

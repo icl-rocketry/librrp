@@ -1,13 +1,15 @@
 #include <iostream>
+#include <sstream>
 #include <cstring>
 #include <unistd.h>
 #include <vector>
 #include <memory>
 #include <thread>
 #include <chrono>
+#include <functional>
 
 // librrp
-#include <librrp/physical/sim_physical_layer.h>
+#include <librrp/physical/lora_sim_physical_layer.h>
 #include <librrp/datalink/turn_timeout.h>
 
 // librnp
@@ -20,12 +22,18 @@
 
 #include "SimNode.h"
 
-int main(int argc, char* argv[]) {
+// Function to run a node in a separate thread
+void runNode(SimNode<TimeoutRadio<LoRaSimPhysicalLayer>>* simNode) {
+    for (;;) {
+        simNode->update();
+    }
+}
 
-    // default number of sim nodes
+int main(int argc, char* argv[]) {
+    // Default number of sim nodes
     int numNodes = 2;
 
-    // command line argument handling
+    // Command line argument handling
     if (argc > 1) {
         try {
             numNodes = std::stoi(argv[1]);
@@ -39,24 +47,47 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    std::vector<std::unique_ptr<SimNode<TimeoutRadio<SimPhysicalLayer>>>> simNodes;
-    std::vector<SimPhysicalLayer*> physicalNodesList;   // this is for the nodes to be able to push to each others physical layer rx buffers
+    // Create nodes and physical layers
+    std::vector<std::unique_ptr<SimNode<TimeoutRadio<LoRaSimPhysicalLayer>>>> simNodes;
+    std::vector<SimPhysicalLayer*> physicalNodesList;   // Nodes for physical layer RX buffers
+
+    // Mutex shared between all nodes
+    std::shared_ptr<std::mutex> mtx = std::make_shared<std::mutex>();
+
+    // LoRa params
+    float freq = 868e6;
+    float bw = 250e3;
+    float sf = 7;
 
     for (int i = 0; i < numNodes; ++i) {
-        simNodes.push_back(std::make_unique<SimNode<TimeoutRadio<SimPhysicalLayer>>>());
-        simNodes.back()->setup();
-        physicalNodesList.push_back(simNodes.back()->getPhysicalLayer()); 
-        std::this_thread::sleep_for(std::chrono::milliseconds(rand()%1000));
+        // Create and initialize a new node
+        auto simNode = std::make_unique<SimNode<TimeoutRadio<LoRaSimPhysicalLayer>>>(mtx, freq, bw, sf);
+        simNode->setup();
+
+        // Add the LoRaSimPhysicalLayer instance to the physical nodes list
+        physicalNodesList.push_back(static_cast<SimPhysicalLayer*>(simNode->getPhysicalLayer()));
+
+        // Add the node to the list of simulation nodes
+        simNodes.push_back(std::move(simNode));
+
+        // Delay for initialization randomness
+        std::this_thread::sleep_for(std::chrono::milliseconds(rand() % 1000));
     }
 
-    for (int i = 0; i < numNodes; ++i){
+    // Set the nodes list for each physical layer
+    for (int i = 0; i < numNodes; ++i) {
         simNodes[i]->getPhysicalLayer()->setNodesList(physicalNodesList);
     }
 
-    // main sim loop
-    for (;;) {
-        for (auto& node : simNodes) {
-            node->update();
+    // Create threads for each node
+    std::vector<std::thread> threads;
+    for (auto& node : simNodes) {
+        threads.emplace_back(runNode, node.get());
+    }
+
+    for (auto& thread : threads) {
+        if (thread.joinable()) {
+            thread.join();
         }
     }
 

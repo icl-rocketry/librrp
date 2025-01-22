@@ -272,6 +272,33 @@ librrp_timeout_test_IS_TOP_LEVEL:STATIC=OFF
 //Value Computed by CMake
 librrp_timeout_test_SOURCE_DIR:STATIC=/home/artem/Documents/RAE/librrp/tests/timeout_test
 
+//Value Computed by CMake
+messagepacket_test_BINARY_DIR:STATIC=/home/artem/Documents/RAE/librrp/build/lib/librnp/tests/messagepacket_test
+
+//Value Computed by CMake
+messagepacket_test_IS_TOP_LEVEL:STATIC=OFF
+
+//Value Computed by CMake
+messagepacket_test_SOURCE_DIR:STATIC=/home/artem/Documents/RAE/librrp/lib/librnp/tests/messagepacket_test
+
+//Value Computed by CMake
+networkmanager_test_BINARY_DIR:STATIC=/home/artem/Documents/RAE/librrp/build/lib/librnp/tests/networkmanager_test
+
+//Value Computed by CMake
+networkmanager_test_IS_TOP_LEVEL:STATIC=OFF
+
+//Value Computed by CMake
+networkmanager_test_SOURCE_DIR:STATIC=/home/artem/Documents/RAE/librrp/lib/librnp/tests/networkmanager_test
+
+//Value Computed by CMake
+stringify_test_BINARY_DIR:STATIC=/home/artem/Documents/RAE/librrp/build/lib/librnp/tests/stringify_test
+
+//Value Computed by CMake
+stringify_test_IS_TOP_LEVEL:STATIC=OFF
+
+//Value Computed by CMake
+stringify_test_SOURCE_DIR:STATIC=/home/artem/Documents/RAE/librrp/lib/librnp/tests/stringify_test
+
 
 ########################
 # INTERNAL cache entries
@@ -381,7 +408,7 @@ CMAKE_MODULE_LINKER_FLAGS_RELWITHDEBINFO-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: CMAKE_NM
 CMAKE_NM-ADVANCED:INTERNAL=1
 //number of local generators
-CMAKE_NUMBER_OF_MAKEFILES:INTERNAL=12
+CMAKE_NUMBER_OF_MAKEFILES:INTERNAL=15
 //ADVANCED property for variable: CMAKE_OBJCOPY
 CMAKE_OBJCOPY-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: CMAKE_OBJDUMP

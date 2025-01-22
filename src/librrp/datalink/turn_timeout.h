@@ -74,6 +74,7 @@ public:
     }
 
     void update() override {
+        
         std::vector<uint8_t> rxData;
         if (_physicalLayer.readPacket(rxData)){  // received data
             if (_packetBuffer == nullptr){
