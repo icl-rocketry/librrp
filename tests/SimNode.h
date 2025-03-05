@@ -6,6 +6,7 @@
 //librrp
 #include <librrp/physical/lora_sim_physical_layer.h>
 #include <librrp/datalink/turn_timeout.h>
+#include <librrp/datalink/tdma.h>
 
 // libriccore
 #include <libriccore/platform/millis.h>
@@ -16,52 +17,56 @@
 template <typename DataLinkProtocol>
 class SimNode {
     public:
-        SimNode(std::shared_ptr<std::mutex> mtx, float frequency, float bandwidth, uint8_t spreadingFactor)
-            : simphysicallayer(mtx, frequency, bandwidth, spreadingFactor),
-            radio(simphysicallayer) {}
+		SimNode(RnpNetworkManager& networkmanager, std::shared_ptr<std::mutex> mtx, float frequency, float bandwidth, uint8_t spreadingFactor)
+			: m_networkmanager(networkmanager),
+			m_simphysicallayer(mtx, frequency, bandwidth, spreadingFactor),
+			m_radio(m_simphysicallayer, networkmanager)
+			{}
+
         
         void setup(){
             
-            radio.setup();
+            m_radio.setup();
 
-            networkmanager.setNodeType(NODETYPE::HUB);
-            networkmanager.addInterface(&radio);
-            networkmanager.enableAutoRouteGen(true);
-            networkmanager.setNoRouteAction(NOROUTE_ACTION::BROADCAST, {2});
+            m_networkmanager.setNodeType(NODETYPE::HUB);
+            m_networkmanager.addInterface(&m_radio);
+            m_networkmanager.enableAutoRouteGen(true);
+            m_networkmanager.setNoRouteAction(NOROUTE_ACTION::BROADCAST, {2});
 
             m_timeLastPacketPushed = millis();
         };
 
         void update(){
-            radio.update();
+            m_radio.update();
 
-            if (millis() - m_timeLastPacketPushed > 1000){
-                pushDummyPackets();
+            if (millis() - m_timeLastPacketPushed > m_sendDelta){
+                // pushDummyPackets();
                 m_timeLastPacketPushed = millis();
             }
         }
 
         LoRaSimPhysicalLayer* getPhysicalLayer(){
-            return &simphysicallayer;
+            return &m_simphysicallayer;
         }
 
     private: 
-        RnpNetworkManager networkmanager;
-        LoRaSimPhysicalLayer simphysicallayer;
-        DataLinkProtocol radio;
+        RnpNetworkManager& m_networkmanager;
+        LoRaSimPhysicalLayer m_simphysicallayer;
+        DataLinkProtocol m_radio;
 
-        uint64_t m_timeLastPacketPushed = 0;
+        uint32_t m_timeLastPacketPushed = 0;
+		uint32_t m_sendDelta = 1000;
 
         void pushDummyPackets(){
             SimpleCommandPacket simplecommandpacket(1,1);
             simplecommandpacket.header.type = 101;
-            simplecommandpacket.header.source = networkmanager.getAddress();
+            simplecommandpacket.header.source = m_networkmanager.getAddress();
             simplecommandpacket.header.source_service = static_cast<uint8_t>(DEFAULT_SERVICES::COMMAND);
             simplecommandpacket.header.destination = 100;
             simplecommandpacket.header.destination_service = simplecommandpacket.header.source_service;
             simplecommandpacket.header.uid = simplecommandpacket.header.uid;
 
-            networkmanager.sendPacket(simplecommandpacket);
+            m_networkmanager.sendPacket(simplecommandpacket);
         }
 
 };

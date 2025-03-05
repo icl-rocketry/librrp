@@ -4,6 +4,12 @@
 #include <cstddef>
 
 
+struct PhysicalLayerInfo {
+	uint32_t timeLastPacketReceived;
+
+    virtual ~PhysicalLayerInfo(){};
+};
+
 class PhysicalLayerBase
 {
     public:
@@ -15,4 +21,5 @@ class PhysicalLayerBase
         virtual size_t readPacket(std::vector<uint8_t>& data) = 0;
         virtual bool isBusy() = 0;
         virtual void restart() = 0;
+		virtual const PhysicalLayerInfo* getInfo() = 0;
 };

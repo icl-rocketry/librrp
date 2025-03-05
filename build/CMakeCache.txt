@@ -264,6 +264,15 @@ librrp_IS_TOP_LEVEL:STATIC=ON
 librrp_SOURCE_DIR:STATIC=/home/artem/Documents/RAE/librrp
 
 //Value Computed by CMake
+librrp_tdma_test_BINARY_DIR:STATIC=/home/artem/Documents/RAE/librrp/build/tests/tdma_test
+
+//Value Computed by CMake
+librrp_tdma_test_IS_TOP_LEVEL:STATIC=OFF
+
+//Value Computed by CMake
+librrp_tdma_test_SOURCE_DIR:STATIC=/home/artem/Documents/RAE/librrp/tests/tdma_test
+
+//Value Computed by CMake
 librrp_timeout_test_BINARY_DIR:STATIC=/home/artem/Documents/RAE/librrp/build/tests/timeout_test
 
 //Value Computed by CMake
@@ -315,7 +324,7 @@ CMAKE_CACHE_MAJOR_VERSION:INTERNAL=3
 //Minor version of cmake used to create the current loaded cache
 CMAKE_CACHE_MINOR_VERSION:INTERNAL=30
 //Patch version of cmake used to create the current loaded cache
-CMAKE_CACHE_PATCH_VERSION:INTERNAL=5
+CMAKE_CACHE_PATCH_VERSION:INTERNAL=7
 //ADVANCED property for variable: CMAKE_COLOR_MAKEFILE
 CMAKE_COLOR_MAKEFILE-ADVANCED:INTERNAL=1
 //Path to CMake executable.
@@ -408,7 +417,7 @@ CMAKE_MODULE_LINKER_FLAGS_RELWITHDEBINFO-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: CMAKE_NM
 CMAKE_NM-ADVANCED:INTERNAL=1
 //number of local generators
-CMAKE_NUMBER_OF_MAKEFILES:INTERNAL=15
+CMAKE_NUMBER_OF_MAKEFILES:INTERNAL=16
 //ADVANCED property for variable: CMAKE_OBJCOPY
 CMAKE_OBJCOPY-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: CMAKE_OBJDUMP

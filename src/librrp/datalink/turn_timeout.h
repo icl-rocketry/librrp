@@ -10,11 +10,12 @@
 #include <libriccore/riccorelogging.h>
 #include <librnp/rnp_interface.h>
 #include <librnp/rnp_packet.h>
+#include <librnp/rnp_networkmanager.h>
 
 #include <librrp/rrp_nvs_save.h>
 
 
-struct TimeoutInterfaceInfo : public RnpInterfaceInfo {
+struct TimeoutRadioInterfaceInfo : public RnpInterfaceInfo {
     uint32_t prevTimeSent;
     uint32_t prevTimeReceived;
     size_t currentSendBufferSize;
@@ -33,10 +34,12 @@ struct TimeoutConfig {
 template <typename PhysicalLayer>
 class TimeoutRadio : public RnpInterface {
 public:
-    TimeoutRadio(PhysicalLayer& physicalLayer, 
-          uint8_t id = 2, 
-          std::string name = "Timeout radio")
+    TimeoutRadio(PhysicalLayer& physicalLayer,
+		RnpNetworkManager& networkManager,
+        uint8_t id = 2, 
+        std::string name = "Timeout radio")
         : _physicalLayer(physicalLayer), 
+		  _networkManager(networkManager),
           _info{}, 
           RnpInterface(id, name) {
             _info.MTU = 256;
@@ -95,7 +98,7 @@ public:
             packet_ptr->header.src_iface = getID();
             _packetBuffer->push(std::move(packet_ptr));//add packet ptr  to buffer
             _info.received=true; 
-            RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Timeout Radio: received packet");
+            // RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Timeout Radio: received packet");
         }
 
         checkSendBuffer();
@@ -120,8 +123,9 @@ public:
             _info.txDone = false;
             _info.prevTimeSent = millis();
             _info.received = false;
-            RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Timeout Radio: packet sent");
+            // RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Timeout Radio: packet sent");
         }
+		RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Timeout Radio: Transmission Success Ratio = " + std::to_string(_physicalLayer.calculateSuccessRatio()));
     }
     
 
@@ -168,9 +172,10 @@ public:
 
 private:
     PhysicalLayer& _physicalLayer;
+	RnpNetworkManager& _networkManager;
     TimeoutConfig _config;
     static constexpr TimeoutConfig defaultConfig{static_cast<uint32_t>(250)};
 
-    TimeoutInterfaceInfo _info;
+    TimeoutRadioInterfaceInfo _info;
     std::queue<std::vector<uint8_t>> _sendBuffer;
 };

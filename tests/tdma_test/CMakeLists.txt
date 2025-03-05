@@ -13,7 +13,6 @@ set(LOCAL ON)
 
 
 
-# add_executable(libriccore_fsm_test ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp ${LIBRNP_SRC})
 add_executable(librrp_tdma_test ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp)
 
 target_compile_features(librrp_tdma_test PRIVATE cxx_std_17)
