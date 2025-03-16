@@ -24,7 +24,7 @@
 #include "../SimNode.h"
 
 void runNode(SimNode<TDMARadio<LoRaSimPhysicalLayer>>* simNode, int nodeNum) {
-	int driftPPM = (nodeNum == 0) ? -10 : 10;
+	int driftPPM = (nodeNum == 0) ? -1000 : 1000;
 	setClockDriftPPM(driftPPM);
 	std::this_thread::sleep_for(std::chrono::milliseconds(rand() % 10000));
     for (;;) {
@@ -53,7 +53,7 @@ int main()
 		networkManagers.emplace_back(std::make_unique<RnpNetworkManager>(100 + i));
 
 		// create and initialize a new node
-		auto simNode = std::make_unique<SimNode<TDMARadio<LoRaSimPhysicalLayer>>>(*networkManagers[i], mtx, freq, bw, sf);
+		auto simNode = std::make_unique<SimNode<TDMARadio<LoRaSimPhysicalLayer>>>(*networkManagers[i], mtx, freq, bw, sf, false);
 		simNode->setup();
 
 		// add LoRaSimPhysicalLayer instance to the physical nodes list

@@ -25,9 +25,17 @@
 
 
 void runNode(SimNode<TimeoutRadio<LoRaSimPhysicalLayer>>* simNode, int nodeNum) {
-	int driftPPM = (nodeNum == 0) ? -10 : 10;
+	int driftPPM = (nodeNum == 0) ? -10000 : 10000;
+	uint32_t timeEntered = millis();
+	// auto programStartTime = std::chrono::steady_clock::now();
 	setClockDriftPPM(driftPPM);
     for (;;) {
+		if (millis() - timeEntered > 1000)
+		{
+			// auto elapsed = std::chrono::steady_clock::now() - programStartTime;
+			// auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count();
+			timeEntered = millis();
+		}
         simNode->update();
     }
 }
@@ -51,7 +59,7 @@ int main(int argc, char* argv[]) {
     for (int i = 0; i < numNodes; ++i) {
     	networkManagers.emplace_back(std::make_unique<RnpNetworkManager>(100 + i));
 
-    	auto simNode = std::make_unique<SimNode<TimeoutRadio<LoRaSimPhysicalLayer>>>(*networkManagers[i], mtx, freq, bw, sf);
+    	auto simNode = std::make_unique<SimNode<TimeoutRadio<LoRaSimPhysicalLayer>>>(*networkManagers[i], mtx, freq, bw, sf, true);
         simNode->setup();
 
         // add LoRaSimPhysicalLayer instance to the physical nodes list

@@ -17,8 +17,9 @@
 template <typename DataLinkProtocol>
 class SimNode {
     public:
-		SimNode(RnpNetworkManager& networkmanager, std::shared_ptr<std::mutex> mtx, float frequency, float bandwidth, uint8_t spreadingFactor)
+		SimNode(RnpNetworkManager& networkmanager, std::shared_ptr<std::mutex> mtx, float frequency, float bandwidth, uint8_t spreadingFactor, bool pushDummyPackets = false)
 			: m_networkmanager(networkmanager),
+			m_pushDummyPackets(pushDummyPackets),
 			m_simphysicallayer(mtx, frequency, bandwidth, spreadingFactor),
 			m_radio(m_simphysicallayer, networkmanager)
 			{}
@@ -39,21 +40,26 @@ class SimNode {
         void update(){
             m_radio.update();
 
-            if (millis() - m_timeLastPacketPushed > m_sendDelta){
-                // pushDummyPackets();
-                m_timeLastPacketPushed = millis();
-            }
+			if (m_pushDummyPackets){
+				if (millis() - m_timeLastPacketPushed > m_sendDelta){
+					pushDummyPackets();
+					m_timeLastPacketPushed = millis();
+				}
+			}
         }
 
         LoRaSimPhysicalLayer* getPhysicalLayer(){
             return &m_simphysicallayer;
         }
 
+		RnpNetworkManager& m_networkmanager;
+
     private: 
-        RnpNetworkManager& m_networkmanager;
+	
         LoRaSimPhysicalLayer m_simphysicallayer;
         DataLinkProtocol m_radio;
 
+		bool m_pushDummyPackets = false;
         uint32_t m_timeLastPacketPushed = 0;
 		uint32_t m_sendDelta = 1000;
 
@@ -62,7 +68,7 @@ class SimNode {
             simplecommandpacket.header.type = 101;
             simplecommandpacket.header.source = m_networkmanager.getAddress();
             simplecommandpacket.header.source_service = static_cast<uint8_t>(DEFAULT_SERVICES::COMMAND);
-            simplecommandpacket.header.destination = 100;
+            simplecommandpacket.header.destination = 3;		// this needs to change
             simplecommandpacket.header.destination_service = simplecommandpacket.header.source_service;
             simplecommandpacket.header.uid = simplecommandpacket.header.uid;
 

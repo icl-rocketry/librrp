@@ -16,7 +16,9 @@ set(LOCAL ON)
 add_executable(librrp_tdma_test ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp)
 
 target_compile_features(librrp_tdma_test PRIVATE cxx_std_17)
-target_include_directories(librrp_tdma_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(librrp_tdma_test PRIVATE 
+	${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/..)
 target_link_libraries(librrp_tdma_test PRIVATE librrp)
 target_link_libraries(librrp_tdma_test PRIVATE libriccore)
 target_link_libraries(librrp_tdma_test PRIVATE librnp)

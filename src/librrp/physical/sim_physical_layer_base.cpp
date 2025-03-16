@@ -34,10 +34,9 @@ void SimPhysicalLayerBase::pushToRxBuffer(std::vector<uint8_t> data){
 }
 
 size_t SimPhysicalLayerBase::readPacket(std::vector<uint8_t>& data){
-    std::lock_guard<std::mutex> lock(*m_mtx);
+    // std::lock_guard<std::mutex> lock(*m_mtx);
     if (rxBuffer.size()){
 		m_info.timeLastPacketReceived = millis();
-		RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Received packet at " + std::to_string(m_info.timeLastPacketReceived));
         data = rxBuffer.front();
         rxBuffer.pop();
     }
