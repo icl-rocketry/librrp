@@ -23,12 +23,12 @@ struct TimeoutRadioInterfaceInfo : public RnpInterfaceInfo {
     bool txDone;
     bool received;
     size_t sendBufferSize;
-    // some other data link layer info
+	uint32_t txCount;
+	uint32_t rxCount;
 };
 
 struct TimeoutConfig {
     uint32_t turnTimeout;
-    // some other config params
 };
 
 template <typename PhysicalLayer>
@@ -44,10 +44,13 @@ public:
           RnpInterface(id, name) {
             _info.MTU = 256;
             _info.sendBufferSize = 2048;
+			_info.txCount = 0;
+			_info.rxCount = 0;
           }
 
     void setup() override {
         _physicalLayer.setup();
+		_physicalLayer.setChannel(0);
     }
 
     void sendPacket(RnpPacket& data) override {
@@ -80,6 +83,9 @@ public:
         
         std::vector<uint8_t> rxData;
         if (_physicalLayer.readPacket(rxData)){  // received data
+
+			RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Timeout Radio: packet received");
+
             if (_packetBuffer == nullptr){
                 return;
             }
@@ -98,7 +104,9 @@ public:
             packet_ptr->header.src_iface = getID();
             _packetBuffer->push(std::move(packet_ptr));//add packet ptr  to buffer
             _info.received=true; 
-            // RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Timeout Radio: received packet");
+			_info.rxCount++;
+
+			RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Tx = " + std::to_string(_info.txCount) + ", Rx = " + std::to_string(_info.rxCount));
         }
 
         checkSendBuffer();
@@ -123,9 +131,9 @@ public:
             _info.txDone = false;
             _info.prevTimeSent = millis();
             _info.received = false;
-            // RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Timeout Radio: packet sent");
+			_info.txCount++;
+            RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Timeout Radio: packet sent");
         }
-		RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Timeout Radio: Transmission Success Ratio = " + std::to_string(_physicalLayer.calculateSuccessRatio()));
     }
     
 
@@ -173,9 +181,9 @@ public:
 private:
     PhysicalLayer& _physicalLayer;
 	RnpNetworkManager& _networkManager;
+    TimeoutRadioInterfaceInfo _info;
     TimeoutConfig _config;
     static constexpr TimeoutConfig defaultConfig{static_cast<uint32_t>(250)};
 
-    TimeoutRadioInterfaceInfo _info;
     std::queue<std::vector<uint8_t>> _sendBuffer;
 };

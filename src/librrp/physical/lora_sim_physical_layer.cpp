@@ -1,10 +1,11 @@
 #include "lora_sim_physical_layer.h"
-#include <chrono>
 #include <thread>
-#include <algorithm>
+#include <sstream>
+#include <libriccore/platform/millis.h>
 
-LoRaSimPhysicalLayer::LoRaSimPhysicalLayer(std::shared_ptr<std::mutex> mtx, float frequency, float bandwidth, uint8_t spreadingFactor, uint8_t codingRate, uint8_t preambleLength, bool crcEnabled, bool implicitHeader, bool lowDataRateOptimization)
-    : SimPhysicalLayerBase(mtx)
+RadioChannelManager LoRaSimPhysicalLayer::radioChannelManager;
+
+LoRaSimPhysicalLayer::LoRaSimPhysicalLayer(float frequency, float bandwidth, uint8_t spreadingFactor, uint8_t codingRate, uint8_t preambleLength, bool crcEnabled, bool implicitHeader, bool lowDataRateOptimization)
 	{
 		m_info.frequency = frequency;
       	m_info.bandwidth = bandwidth;
@@ -16,6 +17,35 @@ LoRaSimPhysicalLayer::LoRaSimPhysicalLayer(std::shared_ptr<std::mutex> mtx, floa
       	m_info.lowDataRateOptimization = lowDataRateOptimization;
 	}
 
+bool LoRaSimPhysicalLayer::setup(){
+    RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("LoRa Sim Physical Layer: setup complete");
+    return true;
+}
+
+bool LoRaSimPhysicalLayer::isBusy(){
+	return false;
+}
+
+size_t LoRaSimPhysicalLayer::sendPacket(std::vector<uint8_t> data){
+	if (m_currentChannel == -1) return 0;
+
+	uint32_t airtimeMs = static_cast<uint32_t>(calculateAirtime(data.size()) * 1000);
+	
+    auto channel = radioChannelManager.getChannel(m_currentChannel);
+    RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("LoRa Sim Physical Layer: sending packet on channel " + std::to_string(m_currentChannel));
+    channel->transmitPacket(data, airtimeMs, this);
+	
+	return data.size();
+}
+
+size_t LoRaSimPhysicalLayer::readPacket(std::vector<uint8_t>& data){
+    if (!m_rxBuffer.empty()) {
+        data = m_rxBuffer.front();
+        m_rxBuffer.pop();
+        return data.size();
+    }    
+	return 0;
+}
 
 float LoRaSimPhysicalLayer::calculateAirtime(size_t payloadSize) const {
     float tSymbol = std::pow(2, m_info.spreadingFactor) / m_info.bandwidth;
@@ -31,43 +61,21 @@ float LoRaSimPhysicalLayer::calculateAirtime(size_t payloadSize) const {
     return tSymbol * (m_info.preambleLength + payloadSymbols);
 }
 
-
-size_t LoRaSimPhysicalLayer::sendPacket(std::vector<uint8_t> data) {
-    if (!m_mtx->try_lock()) {		// Mutex is already locked, indicating a collision
-        RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("LoRa Sim Physical Layer: Packet collision detected");
-        m_transmissionHistory.push_back(false);
-    }
-	else {
-
-		double airtime = calculateAirtime(data.size());    // Calculate airtime
-
-		// Simulate packet transmission (mutex held for airtime duration)
-		std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(airtime * 1000)));
-
-		// Send the packet to all nodes except itself
-		for (SimPhysicalLayerBase* node : m_nodes) {
-			if (node && node != this) {
-				node->pushToRxBuffer(data);
-			}
-		}
-
-		m_mtx->unlock();
-		m_transmissionHistory.push_back(true);
-	}
-
-	if (m_transmissionHistory.size() > m_movingAverageWindowSize) {
-		m_transmissionHistory.pop_front();
-	}
-
-    return data.size();
+void LoRaSimPhysicalLayer::restart(){
+    //do something maybe
 }
 
 
-float LoRaSimPhysicalLayer::calculateSuccessRatio() const {
-    if (m_transmissionHistory.empty()) {
-        return 1.0f;
-    }
+void LoRaSimPhysicalLayer::setChannel(int newChannel){
+	if (m_currentChannel != -1) {
+		radioChannelManager.unregisterNode(m_currentChannel, this);
+	}
+	
+	m_currentChannel = newChannel;
+	
+	radioChannelManager.registerNode(m_currentChannel, this, [this](const std::vector<uint8_t>& data) { pushToRxBuffer(data); });
+}
 
-    size_t successCount = std::count(m_transmissionHistory.begin(), m_transmissionHistory.end(), true);
-    return static_cast<float>(successCount) / m_transmissionHistory.size();
+void LoRaSimPhysicalLayer::pushToRxBuffer(std::vector<uint8_t> data) {
+	m_rxBuffer.push(data);
 }

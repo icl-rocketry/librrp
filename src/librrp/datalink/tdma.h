@@ -72,6 +72,7 @@ class TDMARadio : public RnpInterface
 		{
 			if (m_physicalLayer.setup())
 			{
+				m_physicalLayer.setChannel(0);
 				calcTimeWindowLength();
 				m_regNodes.push_back(m_networkManager.getAddress());	// adding self to list of registered nodes
 				m_timeWindows = m_regNodes.size() + 1;	// adding timewindow where the node just listens
@@ -110,7 +111,7 @@ class TDMARadio : public RnpInterface
 		{
 			getPacket();	// gotta scan for packets all the time otherwise cant sync correctly
 
-			if (millis() - (m_timeMovedTimeWindow) >= m_timeWindowLength){	// + m_networkTimeShift
+			if (millis() - (m_timeMovedTimeWindow) >= m_timeWindowLength){
 				m_networkTimeShift = 0;
 				m_currTimeWindow = (m_currTimeWindow + 1) % m_timeWindows;	// shift timewindow
 				RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Shifted time window to " + std::to_string(m_currTimeWindow));
@@ -374,7 +375,6 @@ class TDMARadio : public RnpInterface
 		
 			}
 			else{                           // buffer empty
-		
 				if (m_countsNoTx >= m_maxCountsNoTx){        // node didn't transmit in a long time
 					//RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("transmit heartbeat");
 					std::vector<uint8_t> heartbeatPacket(m_tdmaHeaderSize);
