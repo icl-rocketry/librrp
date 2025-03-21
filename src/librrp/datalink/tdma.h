@@ -118,8 +118,8 @@ class TDMARadio : public RnpInterface
 				m_timeMovedTimeWindow = millis();
 		
 				// reset bools
-				// m_packetSent = false;
-				// m_received = false;
+				m_packetSent = false;
+				m_received = false;
 				m_txWindowDone = false;
 				m_rxWindowDone = false;
 			}
@@ -344,15 +344,13 @@ class TDMARadio : public RnpInterface
 				// }
 
 				if(!m_packetSent){
-					uint8_t bytesWritten = m_physicalLayer.sendPacket(m_sendBuffer.front());  // send from front of buffer -> sets packetSent to true?
+					uint8_t bytesWritten = m_physicalLayer.sendPacket(m_sendBuffer.front());
 					if (bytesWritten){
 						m_packetSent = true;
 						m_received = false;
-						uint8_t poppedPacketSize = sizeof(m_sendBuffer.back());
-						m_sendBuffer.pop();      			// pop old packet
-						m_info.currentSendBufferSize -= poppedPacketSize;
+						m_sendBuffer.pop();
+						m_info.currentSendBufferSize -= bytesWritten;
 						RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("RNP packet sent");
-						RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Size of send queue: " + std::to_string(m_sendBuffer.size()));
 						// m_countsNoAck++;  // just trust me bro, it makes sense
 						m_countsNoTx = 0; 
 					}
@@ -363,14 +361,14 @@ class TDMARadio : public RnpInterface
 					// {
 					// 	RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("received something: " +  std::to_string(m_lastPacketType));
 					// }
-					if (m_received && m_lastPacketType == PACKET_TYPE::ACK){ // packet got acked
-						RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("got Ack");
-						uint8_t poppedPacketSize = sizeof(m_sendBuffer.back());
-						m_sendBuffer.pop();      			// pop old packet
-						m_info.currentSendBufferSize -= poppedPacketSize;
-						m_countsNoAck = 0;      				// reset counter
-						m_txWindowDone = true;
-					}
+					// if (m_received && m_lastPacketType == PACKET_TYPE::ACK){ // packet got acked
+					// 	RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("got Ack");
+					// 	uint8_t poppedPacketSize = sizeof(m_sendBuffer.back());
+					// 	m_sendBuffer.pop();      			// pop old packet
+					// 	m_info.currentSendBufferSize -= poppedPacketSize;
+					// 	m_countsNoAck = 0;      				// reset counter
+					// 	m_txWindowDone = true;
+					// }
 				} 
 		
 			}
@@ -395,9 +393,6 @@ class TDMARadio : public RnpInterface
 		void rx(){
 
 			if(m_received){
-				// m_networkTimeShift = (m_timeLastPacketReceived - static_cast<uint32_t>(m_physicalLayer.calculateAirtime(m_lastPacketSize)*1e3f)) - m_timeMovedTimeWindow;   //resyncing
-				// RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("( " + std::to_string(m_timeLastPacketReceived) + " - " + std::to_string(m_physicalLayer.calculateAirtime(m_lastPacketSize)*1e3f) + " )" + "-" + std::to_string(m_timeMovedTimeWindow));
-				// RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Network time shift = " + std::to_string(m_networkTimeShift));
 				if (!(m_lastPacketType == ACK || m_lastPacketType == NACK)){	// cuz acks and nacks can be sent at the end of the timewindow
 					m_timeMovedTimeWindow = m_timeLastPacketReceived - static_cast<uint32_t>(m_physicalLayer.calculateAirtime(m_lastPacketSize)*1e3f);
 				}
