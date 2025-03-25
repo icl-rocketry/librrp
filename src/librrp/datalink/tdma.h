@@ -154,7 +154,7 @@ class TDMARadio : public RnpInterface
 		{
 			float maxFrameLength = 2;	// assuming 2 seconds
 			float clockDrift = 2e-5;	// s/s worst drift based on the current xtal
-			float Tg = maxFrameLength * clockDrift;
+			float Tg = maxFrameLength * clockDrift;		// this calc doesnt give big enough value, i think it should be calculated based on the mcu loop speed, clock drift is negligible in comparison
 			m_timeWindowLength = (m_physicalLayer.calculateAirtime(m_info.maxPayloadSize + m_tdmaHeaderSize) + m_physicalLayer.calculateAirtime(m_tdmaHeaderSize) + Tg) * 1e3f;	// (payload + TDMA header) + ack
 			RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Timewindow length = " + std::to_string(m_timeWindowLength));
 		}
@@ -285,7 +285,7 @@ class TDMARadio : public RnpInterface
 
 			std::vector<uint8_t> data;
 		
-			if (m_physicalLayer.readPacket(data) > 0){
+			if (m_physicalLayer.readPacket(data)){
 				m_received = true;
 				m_timeLastPacketReceived = millis();
 		
@@ -326,7 +326,7 @@ class TDMARadio : public RnpInterface
 		
 					// update source interface
 					packet_ptr->header.src_iface = getID();
-					_packetBuffer->push(std::move(packet_ptr));	// add packet ptr to buffer
+					_packetBuffer->push(std::move(packet_ptr));	// add packet ptr to rnp packet buffer
 				}
 			}
 		}
@@ -401,6 +401,7 @@ class TDMARadio : public RnpInterface
 				switch (m_lastPacketType) {
 		
 					case PACKET_TYPE::JOINREQUEST: {                             // handling join request
+
 						
 						RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Received join request");
 		
@@ -428,7 +429,7 @@ class TDMARadio : public RnpInterface
 					
 					case PACKET_TYPE::NORMAL: {                                  // handling RNP packet
 						generateTDMAHeader(ackPacket, PACKET_TYPE::ACK, m_lastPacketSource);
-						m_physicalLayer.sendPacket(ackPacket);
+						m_physicalLayer.sendPacket(ackPacket);				// not acking for now and the other node doesnt seem to receive the ack
 						RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Radio receive");
 						m_rxWindowDone = true; 
 						break; 
@@ -453,6 +454,7 @@ class TDMARadio : public RnpInterface
 			m_currTimeWindow = m_lastPacketTimeWindow;    // sync local current timewindow to network
 			m_txTimeWindow = m_lastPacketRegNodes;        // set to send join request in the n+1th timewindow
 			m_timeWindows = m_lastPacketRegNodes+1;       // update local number of timewindows
+			RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Syncing: time last packet received = " + std::to_string(m_timeLastPacketReceived) + ", airtime of packet = " + std::to_string(static_cast<uint32_t>(m_physicalLayer.calculateAirtime(m_lastPacketSize)*1e3f)));
 			m_timeMovedTimeWindow = m_timeLastPacketReceived - static_cast<uint32_t>(m_physicalLayer.calculateAirtime(m_lastPacketSize)*1e3f);
 			m_synced = true;                        // syncing complete
 		}
@@ -479,6 +481,8 @@ class TDMARadio : public RnpInterface
 		void unpackTDMAHeader(std::vector<uint8_t> &packet){
 		    uint8_t initial_size = packet.size();
 			auto it = packet.begin();
+
+			m_lastPacketSize = initial_size;
 
 			m_lastPacketType = static_cast<PACKET_TYPE>(*it++);
 			m_lastPacketRegNodes     = *it++;
@@ -556,5 +560,10 @@ class TDMARadio : public RnpInterface
 		TDMARadioInterfaceInfo m_info;
 		PhysicalLayer& m_physicalLayer;
 		RnpNetworkManager& m_networkManager;
+
+
+		// TESTING
+		bool skipInitialJoinRequest = true;
+		//
 
 };

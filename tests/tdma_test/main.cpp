@@ -39,12 +39,8 @@ int main()
 {
     int numNodes = 2;
 
-   // create nodes and physical layers
    std::vector<std::unique_ptr<SimNode<TDMARadio<LoRaSimPhysicalLayer>>>> simNodes;
    std::vector<std::unique_ptr<RnpNetworkManager>> networkManagers;
-
-   // mutex shared between all nodes
-   std::shared_ptr<std::mutex> mtx = std::make_shared<std::mutex>();
 
    // LoRa params
    float freq = 868e6;
@@ -52,7 +48,7 @@ int main()
    float sf = 7;
 
    for (int i = 0; i < numNodes; ++i) {
-		networkManagers.emplace_back(std::make_unique<RnpNetworkManager>(100, NODETYPE::LEAF, true));
+		networkManagers.emplace_back(std::make_unique<RnpNetworkManager>(100, NODETYPE::LEAF, true));	// the address gets reset in simNode.setup()
 
 		auto simNode = std::make_unique<SimNode<TDMARadio<LoRaSimPhysicalLayer>>>(*networkManagers[i], freq, bw, sf, true);
 		simNode->setup();

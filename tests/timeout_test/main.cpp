@@ -40,7 +40,6 @@ void runNode(SimNode<TimeoutRadio<LoRaSimPhysicalLayer>>* simNode, int nodeNum) 
 int main(int argc, char* argv[]) {
     int numNodes = 2;
 
-    // create nodes and network managers
     std::vector<std::unique_ptr<SimNode<TimeoutRadio<LoRaSimPhysicalLayer>>>> simNodes;
 	std::vector<std::unique_ptr<RnpNetworkManager>> networkManagers;
 
@@ -50,7 +49,7 @@ int main(int argc, char* argv[]) {
     uint8_t sf = 7;
 
     for (int i = 0; i < numNodes; ++i) {
-    	networkManagers.emplace_back(std::make_unique<RnpNetworkManager>(100, NODETYPE::LEAF, true));
+    	networkManagers.emplace_back(std::make_unique<RnpNetworkManager>(100, NODETYPE::LEAF, true));	// the address gets reset in simNode.setup()
 
     	auto simNode = std::make_unique<SimNode<TimeoutRadio<LoRaSimPhysicalLayer>>>(*networkManagers[i], freq, bw, sf, true);
         simNode->setup();

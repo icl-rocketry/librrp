@@ -13,6 +13,8 @@ void RadioChannel::transmitPacket(const std::vector<uint8_t>& data, uint32_t air
         return;
     }
 
+	RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("RadioChannel: airtime = " + std::to_string(airtimeMs) + ", size = " + std::to_string(data.size()));
+
 	// Start transmission
     m_busy = true;
     m_busyUntil = now + std::chrono::milliseconds(airtimeMs);
