@@ -25,19 +25,16 @@ enum class SimNode_COMMAND_IDS : uint8_t {
 template <typename DataLinkProtocol>
 class SimNode {
 public:
-    SimNode(RnpNetworkManager& networkmanager, float frequency, float bandwidth, uint8_t spreadingFactor, bool pushDummyPackets = false)
-        : m_networkmanager(networkmanager),
+    SimNode(int nodeNum, float frequency, float bandwidth, uint8_t spreadingFactor, bool pushDummyPackets = false)
+        : m_nodeNum(nodeNum),
           m_pushDummyPackets(pushDummyPackets),
           m_simphysicallayer(frequency, bandwidth, spreadingFactor),
-          m_radio(m_simphysicallayer, networkmanager),
+		  m_networkmanager(100, NODETYPE::LEAF, true),
+		  m_radio(m_simphysicallayer, m_networkmanager),
           m_dummycommandhandler(static_cast<uint8_t>(DEFAULT_SERVICES::COMMAND), createCommandMap()) 
-    {
-		++instanceCount;
-	}
+    {}
 
-    ~SimNode() {
-        --instanceCount;
-    }
+    ~SimNode() {}
 
     void setup() {
         m_radio.setup();
@@ -50,8 +47,10 @@ public:
 		m_networkmanager.setLogCb([](const std::string& msg) {
 			std::cout << "NetworkManager Log: " << msg << std::endl; 
 			RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>(msg);});
-		int RNPAddress = 100 + instanceCount;
-		nodesRNPAddresses.push_back(RNPAddress);
+		int RNPAddress = 101 + m_nodeNum;
+		if (find(simulatedRNPAddresses.begin(), simulatedRNPAddresses.end(), RNPAddress) == simulatedRNPAddresses.end()){
+			simulatedRNPAddresses.push_back(RNPAddress);
+		}
 		m_networkmanager.setAddress(RNPAddress);
 		RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Created sim node with RNP address = " + std::to_string(m_networkmanager.getAddress()));
 
@@ -75,14 +74,14 @@ public:
     }
 
 private:
-    RnpNetworkManager& m_networkmanager;
+	int m_nodeNum;
 	bool m_pushDummyPackets;
 	LoRaSimPhysicalLayer m_simphysicallayer;
 	DataLinkProtocol m_radio;
+	RnpNetworkManager m_networkmanager;
     DummyCommandHandler<SimNode_COMMAND_IDS> m_dummycommandhandler;
 
-	static int instanceCount;
-	static std::vector<int> nodesRNPAddresses; 
+	static std::vector<int> simulatedRNPAddresses; 
 
     uint32_t m_timeLastPacketPushed = 0;
     uint32_t m_sendDelta = 1000;
@@ -109,9 +108,9 @@ private:
         simplecommandpacket.header.source_service = m_dummycommandhandler.getServiceID();
 
 		int destAddress = -1;
-		for (size_t i = 0; i < nodesRNPAddresses.size(); ++i) {
-			if (nodesRNPAddresses[i] != m_networkmanager.getAddress()) {
-				destAddress = nodesRNPAddresses[i];
+		for (size_t i = 0; i < simulatedRNPAddresses.size(); ++i) {
+			if (simulatedRNPAddresses[i] != m_networkmanager.getAddress()) {
+				destAddress = simulatedRNPAddresses[i];
 				break;  // Select the first address that is not this node's address
 			}
 		}
@@ -132,7 +131,4 @@ private:
 };
 
 template <typename DataLinkProtocol>
-int SimNode<DataLinkProtocol>::instanceCount = 0;
-
-template <typename DataLinkProtocol>
-std::vector<int> SimNode<DataLinkProtocol>::nodesRNPAddresses;
+std::vector<int> SimNode<DataLinkProtocol>::simulatedRNPAddresses;

@@ -1,0 +1,7 @@
+TWO NODE TESTS
+
+1. 	node0 starts up first, node1 joins a short interval later
+	PASSED
+
+2. 	node0 starts up first, node1 joins a short interval later, 
+	node1 restarts, tries joining again.
