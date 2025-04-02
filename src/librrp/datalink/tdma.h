@@ -82,7 +82,7 @@ class TDMARadio : public RnpInterface
 
 		void sendPacket(RnpPacket& data) override
 		{
-			const size_t dataSize = data.header.size() + data.header.packet_len + m_tdmaHeaderSize;
+			const size_t dataSize = data.header.size() + data.header.packet_len;
 
 			// checking if exceeding limits on the tdma level but should be doing similar checks at physical layer for phys layer specific limits?
 			if (dataSize > m_info.MTU){ 
@@ -99,9 +99,6 @@ class TDMARadio : public RnpInterface
 
 			std::unique_ptr<std::vector<uint8_t>> serializedPacket = std::make_unique<std::vector<uint8_t>>();
 			data.serialize(*serializedPacket);
-			std::vector<uint8_t> tdmaHeader(m_tdmaHeaderSize);
-			generateTDMAHeader(tdmaHeader, PACKET_TYPE::NORMAL, 0);	// what the hell does 0 stand for as the info param?
-			serializedPacket->insert(serializedPacket->begin(), tdmaHeader.begin(), tdmaHeader.end());
 			m_sendBuffer.push(*serializedPacket);
 			m_info.sendBufferOverflow = false;
 			m_info.currentSendBufferSize += dataSize;
@@ -202,8 +199,8 @@ class TDMARadio : public RnpInterface
 
 				case DISCOVERY_PHASE::JOIN_REQUEST: {
 					if(m_currTimeWindow == m_txTimeWindow){
-						generateTDMAHeader(joinRequest, PACKET_TYPE::JOINREQUEST, m_lastPacketSource);
-						if(m_physicalLayer.sendPacket(joinRequest) > 0){
+						std::vector<uint8_t> emptyPacket;
+						if(sendPacketWithTDMAHeader(emptyPacket, PACKET_TYPE::JOINREQUEST, m_lastPacketSource) > 0){
 							RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Join request sent");
 							m_packetSent = true;
 							m_received = false;
@@ -291,7 +288,9 @@ class TDMARadio : public RnpInterface
 		
 				// unpack TDMA header
 				try{
+					RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Size before unpacking = " + std::to_string(data.size()));
 					unpackTDMAHeader(data); // modifies data vector
+					RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Size after unpacking = " + std::to_string(data.size()));
 				}
 				catch (std::exception& e)
 				{
@@ -344,13 +343,13 @@ class TDMARadio : public RnpInterface
 				// }
 
 				if(!m_packetSent){
-					uint8_t bytesWritten = m_physicalLayer.sendPacket(m_sendBuffer.front());
+					uint8_t bytesWritten = sendPacketWithTDMAHeader(m_sendBuffer.front(), PACKET_TYPE::NORMAL, 0) - m_tdmaHeaderSize;
 					if (bytesWritten){
 						m_packetSent = true;
 						m_received = false;
 						m_sendBuffer.pop();
 						m_info.currentSendBufferSize -= bytesWritten;
-						RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("RNP packet sent");
+						RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("RNP packet sent, current timewindow = " + std::to_string(m_currTimeWindow));
 						// m_countsNoAck++;  // just trust me bro, it makes sense
 						m_countsNoTx = 0; 
 					}
@@ -375,10 +374,9 @@ class TDMARadio : public RnpInterface
 			else{                           // buffer empty
 				if (m_countsNoTx >= m_maxCountsNoTx){        // node didn't transmit in a long time
 					//RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("transmit heartbeat");
-					std::vector<uint8_t> heartbeatPacket(m_tdmaHeaderSize);
-					generateTDMAHeader(heartbeatPacket, PACKET_TYPE::HEARTBEAT, 0);
+					std::vector<uint8_t> emptyPacket;
+					sendPacketWithTDMAHeader(emptyPacket, PACKET_TYPE::HEARTBEAT, 0);
 					RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Sending heartbeat packet");
-					m_physicalLayer.sendPacket(heartbeatPacket);  // send without pushing to send queue
 					m_countsNoTx = 0;
 					m_txWindowDone = true;
 				}
@@ -411,16 +409,15 @@ class TDMARadio : public RnpInterface
 							RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("RNP Node (requesting node) " + std::to_string(m_lastPacketSource) + " added to list");
 							m_regNodes.push_back(m_lastPacketSource);           // add to node list
 							m_timeWindows = m_regNodes.size() + 1;             	// update number of timewindows
-							RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Timewindows = " + std::to_string(m_timeWindows) + ", tx timewindow = " + std::to_string(m_txTimeWindow));
-			 
-							generateTDMAHeader(ackPacket, PACKET_TYPE::ACK, m_lastPacketSource);     //ack join request
-							m_physicalLayer.sendPacket(ackPacket);            
+							RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Timewindows = " + std::to_string(m_timeWindows) + ", tx timewindow = " + std::to_string(m_txTimeWindow));  
+							std::vector<uint8_t> emptyPacket;
+							sendPacketWithTDMAHeader(emptyPacket, PACKET_TYPE::ACK, m_lastPacketSource);
 							m_rxWindowDone = true;
 						}
 						else{                                                   // node has already registered
 							uint8_t requesterTxTimewindow = static_cast<uint8_t>(it - m_regNodes.begin());
-							generateTDMAHeader(ackPacket, PACKET_TYPE::NACK, m_lastPacketSource, requesterTxTimewindow); // nack join request
-							m_physicalLayer.sendPacket(ackPacket);            
+							std::vector<uint8_t> emptyPacket;
+							sendPacketWithTDMAHeader(emptyPacket, PACKET_TYPE::NACK, m_lastPacketSource, requesterTxTimewindow);
 							m_rxWindowDone = true;               
 						}
 						break;
@@ -428,8 +425,8 @@ class TDMARadio : public RnpInterface
 						
 					
 					case PACKET_TYPE::NORMAL: {                                  // handling RNP packet
-						generateTDMAHeader(ackPacket, PACKET_TYPE::ACK, m_lastPacketSource);
-						m_physicalLayer.sendPacket(ackPacket);				// not acking for now and the other node doesnt seem to receive the ack
+						std::vector<uint8_t> emptyPacket;
+						sendPacketWithTDMAHeader(emptyPacket, PACKET_TYPE::ACK, m_lastPacketSource);
 						RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Radio receive");
 						m_rxWindowDone = true; 
 						break; 
@@ -454,7 +451,8 @@ class TDMARadio : public RnpInterface
 			m_currTimeWindow = m_lastPacketTimeWindow;    // sync local current timewindow to network
 			m_txTimeWindow = m_lastPacketRegNodes;        // set to send join request in the n+1th timewindow
 			m_timeWindows = m_lastPacketRegNodes+1;       // update local number of timewindows
-			RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Syncing: time last packet received = " + std::to_string(m_timeLastPacketReceived) + ", airtime of packet = " + std::to_string(static_cast<uint32_t>(m_physicalLayer.calculateAirtime(m_lastPacketSize)*1e3f)));
+			RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Syncing: time last packet received = " + std::to_string(m_timeLastPacketReceived) + ", airtime of packet = " + std::to_string(static_cast<uint32_t>(m_physicalLayer.calculateAirtime(m_lastPacketSize)*1e3f)) + 
+				"last packet timewindow = " + std::to_string(m_lastPacketTimeWindow));
 			m_timeMovedTimeWindow = m_timeLastPacketReceived - static_cast<uint32_t>(m_physicalLayer.calculateAirtime(m_lastPacketSize)*1e3f);
 			m_synced = true;                        // syncing complete
 		}
@@ -466,16 +464,20 @@ class TDMARadio : public RnpInterface
 			m_timeMovedTimeWindow = millis();
 		}
 
-		void generateTDMAHeader(std::vector<uint8_t> &TDMAHeader, PACKET_TYPE packettype, uint8_t destinationNode){
-			TDMAHeader = {static_cast<uint8_t>(packettype), static_cast<uint8_t>(m_regNodes.size()), 
-							m_currTimeWindow, static_cast<uint8_t>(m_networkManager.getAddress()), 
-							static_cast<uint8_t>(destinationNode), static_cast<uint8_t>(255)};
+		size_t sendPacketWithTDMAHeader(std::vector<uint8_t> &packet, PACKET_TYPE packettype, uint8_t destinationNode){
+			std::vector<uint8_t> TDMAHeader = {static_cast<uint8_t>(packettype), static_cast<uint8_t>(m_regNodes.size()), 
+				m_currTimeWindow, static_cast<uint8_t>(m_networkManager.getAddress()), 
+				static_cast<uint8_t>(destinationNode), static_cast<uint8_t>(255)};
+			packet.insert(packet.begin(), TDMAHeader.begin(), TDMAHeader.end());
+			return (m_physicalLayer.sendPacket(packet));
 		}
-		
-		void generateTDMAHeader(std::vector<uint8_t> &TDMAHeader, PACKET_TYPE packettype, uint8_t destinationNode, uint8_t info){
-			TDMAHeader = {static_cast<uint8_t>(packettype), static_cast<uint8_t>(m_regNodes.size()), 
-							m_currTimeWindow, static_cast<uint8_t>(m_networkManager.getAddress()), 
-							static_cast<uint8_t>(destinationNode), info};
+
+		size_t sendPacketWithTDMAHeader(std::vector<uint8_t> &packet, PACKET_TYPE packettype, uint8_t destinationNode, uint8_t info){
+			std::vector<uint8_t> TDMAHeader = {static_cast<uint8_t>(packettype), static_cast<uint8_t>(m_regNodes.size()), 
+				m_currTimeWindow, static_cast<uint8_t>(m_networkManager.getAddress()), 
+				static_cast<uint8_t>(destinationNode), info};
+			packet.insert(packet.begin(), TDMAHeader.begin(), TDMAHeader.end());
+			return (m_physicalLayer.sendPacket(packet));
 		}
 
 		void unpackTDMAHeader(std::vector<uint8_t> &packet){
@@ -543,9 +545,9 @@ class TDMARadio : public RnpInterface
 		bool m_txWindowDone;
 		bool m_rxWindowDone;
 
-		TDMA_MODE m_currMode;
+		TDMA_MODE m_currMode = TDMA_MODE::DISCOVERY;
 
-		DISCOVERY_PHASE m_currDiscoveryPhase;
+		DISCOVERY_PHASE m_currDiscoveryPhase = DISCOVERY_PHASE::ENTRY;
 
 		uint8_t m_tdmaHeaderSize = 6;
 

@@ -8,6 +8,7 @@
 #include <thread>
 #include <chrono>
 
+const auto programStartTime = std::chrono::steady_clock::now();
 
 class SimLogger : public LoggerBase
 {

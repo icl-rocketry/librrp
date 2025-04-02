@@ -32,9 +32,10 @@ public:
 		  m_networkmanager(100, NODETYPE::LEAF, true),
 		  m_radio(m_simphysicallayer, m_networkmanager),
           m_dummycommandhandler(static_cast<uint8_t>(DEFAULT_SERVICES::COMMAND), createCommandMap()) 
-    {}
+    {RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("node" + std::to_string(m_nodeNum) + " constructed!");}
 
-    ~SimNode() {}
+    ~SimNode() 
+	{RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("node" + std::to_string(m_nodeNum) + " destroyed!");}
 
     void setup() {
         m_radio.setup();
@@ -77,8 +78,8 @@ private:
 	int m_nodeNum;
 	bool m_pushDummyPackets;
 	LoRaSimPhysicalLayer m_simphysicallayer;
-	DataLinkProtocol m_radio;
 	RnpNetworkManager m_networkmanager;
+	DataLinkProtocol m_radio;
     DummyCommandHandler<SimNode_COMMAND_IDS> m_dummycommandhandler;
 
 	static std::vector<int> simulatedRNPAddresses; 
