@@ -34,5 +34,7 @@ private:
 
     std::chrono::steady_clock::time_point m_busyUntil;
     std::vector<Receiver> m_receivers;
+
+	float m_packetDropProbability = 0.0;
 };
 

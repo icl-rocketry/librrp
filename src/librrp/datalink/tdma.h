@@ -70,12 +70,10 @@ class TDMARadio : public RnpInterface
 
 		void setup() override 
 		{
-			if (m_physicalLayer.setup())
-			{
+			if (m_physicalLayer.setup()) {
 				m_physicalLayer.setChannel(0);
 				calcTimeWindowLength();
-				m_regNodes.push_back(m_networkManager.getAddress());	// adding self to list of registered nodes
-				m_timeWindows = m_regNodes.size() + 1;	// adding timewindow where the node just listens
+				m_timeWindows = 1;			// single timewindow where node just listens
 			}
 			m_timeMovedTimeWindow = millis();
 		}
@@ -84,14 +82,13 @@ class TDMARadio : public RnpInterface
 		{
 			const size_t dataSize = data.header.size() + data.header.packet_len;
 
-			// checking if exceeding limits on the tdma level but should be doing similar checks at physical layer for phys layer specific limits?
 			if (dataSize > m_info.MTU){ 
-				RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Radio: Packet Exceeds Interface MTU");
+				RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Radio: Packet exceeds interface MTU");
 				++m_info.txerror;
 				return;
 			}
 			if (dataSize + m_info.currentSendBufferSize > m_info.maxSendBufferSize){
-				RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Radio: Send Buffer Overflow");
+				RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Radio: Send buffer overflow");
 				++m_info.txerror;
 				m_info.sendBufferOverflow = true;
 				return;
@@ -106,12 +103,11 @@ class TDMARadio : public RnpInterface
 
 		void update() override
 		{
-			getPacket();	// gotta scan for packets all the time otherwise cant sync correctly
+			getPacket();	// gotta scan for packets on every loop otherwise packet time-based info is inaccurate
 
 			if (millis() - (m_timeMovedTimeWindow) >= m_timeWindowLength){
-				m_networkTimeShift = 0;
 				m_currTimeWindow = (m_currTimeWindow + 1) % m_timeWindows;	// shift timewindow
-				RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Shifted time window to " + std::to_string(m_currTimeWindow));
+				RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Radio: Shifted timewindow to " + std::to_string(m_currTimeWindow));
 				m_timeMovedTimeWindow = millis();
 		
 				// reset bools
@@ -141,7 +137,6 @@ class TDMARadio : public RnpInterface
 		}
 
 		const RnpInterfaceInfo* getInfo() override {
-			// this needs to be data link layer info plus encapsulation of physical layer info
 			return &m_info;
 		}
 
@@ -151,19 +146,17 @@ class TDMARadio : public RnpInterface
 		{
 			float maxFrameLength = 2;	// assuming 2 seconds
 			float clockDrift = 2e-5;	// s/s worst drift based on the current xtal
-			float Tg = maxFrameLength * clockDrift;		// this calc doesnt give big enough value, i think it should be calculated based on the mcu loop speed, clock drift is negligible in comparison
+			float Tg = maxFrameLength * clockDrift;		// this calc doesnt give big enough value, i think it should be calculated based on the loop speed, clock drift is negligible in comparison
 			m_timeWindowLength = (m_physicalLayer.calculateAirtime(m_info.maxPayloadSize + m_tdmaHeaderSize) + m_physicalLayer.calculateAirtime(m_tdmaHeaderSize) + Tg) * 1e3f;	// (payload + TDMA header) + ack
-			RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Timewindow length = " + std::to_string(m_timeWindowLength));
+			RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Radio: Calculated timewindow length = " + std::to_string(m_timeWindowLength));
 		}
 	
 		void discovery(){
 
-			std::vector<uint8_t> joinRequest(m_tdmaHeaderSize);
-
 			switch(m_currDiscoveryPhase) {
 
 				case DISCOVERY_PHASE::ENTRY: {
-					RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Entered Discovery");
+					RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Radio: Entered Discovery");
 					m_timeEnteredDiscovery = millis();					// timestamp entry into discovery
 					m_currDiscoveryPhase = DISCOVERY_PHASE::SNIFFING; 	// transition to next phase
 					break;
@@ -172,27 +165,27 @@ class TDMARadio : public RnpInterface
 				case DISCOVERY_PHASE::SNIFFING: {
 
 					if (m_received){
-						RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Network detected");
 						m_currDiscoveryPhase = DISCOVERY_PHASE::SYNCING;       // transition to network syncing
+						RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Radio: Network detected");
 					}
 					else if (millis() - m_timeEnteredDiscovery > m_discoveryTimeout){
 						m_currDiscoveryPhase = DISCOVERY_PHASE::INIT_NETWORK;  // transition to network initialisation
+						RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Radio: No network activity detected, initialising network");
 					}
 					break;
 				}
 				
 
 				case DISCOVERY_PHASE::INIT_NETWORK: {
-					RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Initialising network");
 					initNetwork();
-					m_currDiscoveryPhase = DISCOVERY_PHASE::EXIT;              // transition to exit phase
+					m_currDiscoveryPhase = DISCOVERY_PHASE::EXIT;
 					break;
 				}
 
 
 				case DISCOVERY_PHASE::SYNCING: {
 					sync();
-					m_currDiscoveryPhase = DISCOVERY_PHASE::JOIN_REQUEST;      // transition to requesting to join
+					m_currDiscoveryPhase = DISCOVERY_PHASE::JOIN_REQUEST;
 					break;
 				}
 
@@ -201,7 +194,7 @@ class TDMARadio : public RnpInterface
 					if(m_currTimeWindow == m_txTimeWindow){
 						std::vector<uint8_t> emptyPacket;
 						if(sendPacketWithTDMAHeader(emptyPacket, PACKET_TYPE::JOINREQUEST, m_lastPacketSource) > 0){
-							RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Join request sent");
+							RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Radio: Join request sent");
 							m_packetSent = true;
 							m_received = false;
 							m_timeJoinRequestSent = millis();
@@ -214,47 +207,45 @@ class TDMARadio : public RnpInterface
 
 				case DISCOVERY_PHASE::JOIN_REQUEST_RESPONSE: {
 
-					// if (m_received){
-					// 	RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Received something: " + std::to_string(m_lastPacketType) + ", " + std::to_string(m_lastPacketDest) + ", " + std::to_string(m_networkManager.getAddress()));
-					// }
-
+					// join request ack
 					if(m_received && m_lastPacketType == PACKET_TYPE::ACK && m_lastPacketDest == m_networkManager.getAddress()){
-						RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Joined network");
-						try {
-							updateRegisteredNodes(m_lastPacketSource);
-						}catch (std::exception& e){
-							RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("ERROR updating reg nodes list: " + std::string(e.what()));
-						}
-						//registeredNodes.push_back(_networkmanager.getAddress()); // add self to list
-						//registeredNodes.push_back(packetDest);       // maybe should not add to the registered nodes list
+						RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Radio: Received join request ack");
+
 						m_timeWindows = m_lastPacketRegNodes + 1;   // set local number of timewindows to match network
-						m_txTimeWindow = m_timeWindows - 2;
-						RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Number of timewindows set to " + std::to_string(m_timeWindows) + ", tx timewindow set to " + std::to_string(m_txTimeWindow));
+						m_txTimeWindow = m_timeWindows - 2;			// set local tx timewindow
+
+						m_regNodes.resize(m_lastPacketRegNodes);
+						m_regNodes[m_lastPacketInfo] = m_lastPacketSource;	// m_lastPacketInfo field contains the tx timewindow of the acking node in the case of an ack
+						m_regNodes[m_regNodes.size() - 1] = m_networkManager.getAddress();	// add self to end of list
+
 						m_received = false;
 						m_currDiscoveryPhase = DISCOVERY_PHASE::EXIT;
+
+						for (int i = 0; i < m_regNodes.size(); ++i){
+							RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("reg nodes after discovery phase: " + std::to_string(m_regNodes[i]));
+						}
 					}
 
+					// join request nack
 					else if(m_received && m_lastPacketType == PACKET_TYPE::NACK && m_lastPacketDest == m_networkManager.getAddress()){  
-						RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Node joined before");
-						m_txTimeWindow = m_lastPacketInfo;
-						try{
-							updateRegisteredNodes(m_networkManager.getAddress());
-						}catch (std::exception& e){
-							RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("ERROR updating reg nodes list: " + std::string(e.what()));
-						}
-						try {
-							updateRegisteredNodes(m_lastPacketSource);
-						}catch (std::exception& e){
-							RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("ERROR updating reg nodes list: " + std::string(e.what()));
-						}
-						//registeredNodes.push_back(_networkmanager.getAddress()); // add self to list
-						//registeredNodes.push_back(packetDest);       // maybe should not add to the registered nodes list
+						RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Radio: This node has joined before");
 						m_timeWindows = m_lastPacketRegNodes + 1;
+						m_txTimeWindow = m_lastPacketInfo;	// m_lastPacketInfo field contains the tx timewindow of the requesting node in the case of a nack
+
+						// TODO: this needs to change cuz we need to place the address of the nacking node in the right position in the reg nodes list
+						m_regNodes.push_back(m_lastPacketSource);
+						m_regNodes.insert(m_regNodes.begin() + m_txTimeWindow, m_networkManager.getAddress());
+						//
 						m_received = false;
 						m_currDiscoveryPhase = DISCOVERY_PHASE::EXIT;
+
+						for (int i = 0; i < m_regNodes.size(); ++i){
+							RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("reg nodes after discovery phase: " + std::to_string(m_regNodes[i]));
+						}
 					}
 
-					if (millis() - m_timeJoinRequestSent > m_joinRequestTimeout || (m_received && m_lastPacketType == PACKET_TYPE::HEARTBEAT)){       // request expired
+					// join request expired
+					if (millis() - m_timeJoinRequestSent > m_joinRequestTimeout || (m_received && m_lastPacketType == PACKET_TYPE::HEARTBEAT)){
 						m_currDiscoveryPhase = DISCOVERY_PHASE::JOIN_REQUEST;  // try again
 					}
 					break;
@@ -262,8 +253,8 @@ class TDMARadio : public RnpInterface
 
 				
 				case DISCOVERY_PHASE::EXIT: {
-					RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Exiting discovery");
 					m_currMode = TDMA_MODE::TRANSMIT;      // to exit out of discovery, assign any other mode other than discovery
+					RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Exiting discovery");
 					break;
 				}
 
@@ -286,14 +277,9 @@ class TDMARadio : public RnpInterface
 				m_received = true;
 				m_timeLastPacketReceived = millis();
 		
-				// unpack TDMA header
-				try{
-					RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Size before unpacking = " + std::to_string(data.size()));
+				try{					// unpack TDMA header
 					unpackTDMAHeader(data); // modifies data vector
-					RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Size after unpacking = " + std::to_string(data.size()));
-				}
-				catch (std::exception& e)
-				{
+				} catch (std::exception& e){
 					RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Error: " + std::string(e.what()));
 					return;
 				}
@@ -303,7 +289,7 @@ class TDMARadio : public RnpInterface
 				//     registeredNodes.resize(packetRegNodes);
 				// }        
 		
-				if (data.size() > 0){     // packet contains not just the tdma header
+				if (data.size()){     // packet contains something after unpacking the tdma header
 		
 					if (_packetBuffer == nullptr){
 						return;
@@ -332,7 +318,7 @@ class TDMARadio : public RnpInterface
 
 		void tx(){
 
-			if(m_sendBuffer.size() > 0){    //buffer not empty
+			if(m_sendBuffer.size()){    //buffer not empty
 
 				// if(m_countsNoAck > m_maxCountsNoAck){  	// check if exceed limit on resends
 				// 	uint8_t poppedPacketSize = sizeof(m_sendBuffer.back());
@@ -349,9 +335,9 @@ class TDMARadio : public RnpInterface
 						m_received = false;
 						m_sendBuffer.pop();
 						m_info.currentSendBufferSize -= bytesWritten;
-						RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("RNP packet sent, current timewindow = " + std::to_string(m_currTimeWindow));
 						// m_countsNoAck++;  // just trust me bro, it makes sense
 						m_countsNoTx = 0; 
+						RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Radio: RNP packet sent");
 					}
 				}
 				else{                   // packet has been sent
@@ -373,12 +359,11 @@ class TDMARadio : public RnpInterface
 			}
 			else{                           // buffer empty
 				if (m_countsNoTx >= m_maxCountsNoTx){        // node didn't transmit in a long time
-					//RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("transmit heartbeat");
 					std::vector<uint8_t> emptyPacket;
 					sendPacketWithTDMAHeader(emptyPacket, PACKET_TYPE::HEARTBEAT, 0);
-					RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Sending heartbeat packet");
 					m_countsNoTx = 0;
 					m_txWindowDone = true;
+					RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Radio: Heartbeat packet sent");
 				}
 				else{ 
 					m_countsNoTx ++;             // update counter
@@ -394,31 +379,30 @@ class TDMARadio : public RnpInterface
 				if (!(m_lastPacketType == ACK || m_lastPacketType == NACK)){	// cuz acks and nacks can be sent at the end of the timewindow
 					m_timeMovedTimeWindow = m_timeLastPacketReceived - static_cast<uint32_t>(m_physicalLayer.calculateAirtime(m_lastPacketSize)*1e3f);
 				}
-				std::vector<uint8_t> ackPacket(m_tdmaHeaderSize);     // initialising ack packet
 		
 				switch (m_lastPacketType) {
 		
-					case PACKET_TYPE::JOINREQUEST: {                             // handling join request
-
+					case PACKET_TYPE::JOINREQUEST: {
 						
-						RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Received join request");
+						RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Radio: Received join request");
 		
 						auto it = find(m_regNodes.begin(), m_regNodes.end(), m_lastPacketSource);
 		
 						if(it == m_regNodes.end()){                        		// node has not been registered yet
-							RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("RNP Node (requesting node) " + std::to_string(m_lastPacketSource) + " added to list");
 							m_regNodes.push_back(m_lastPacketSource);           // add to node list
+							RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Radio: RNP Node (requesting node) " + std::to_string(m_lastPacketSource) + " added to list");
 							m_timeWindows = m_regNodes.size() + 1;             	// update number of timewindows
-							RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Timewindows = " + std::to_string(m_timeWindows) + ", tx timewindow = " + std::to_string(m_txTimeWindow));  
 							std::vector<uint8_t> emptyPacket;
-							sendPacketWithTDMAHeader(emptyPacket, PACKET_TYPE::ACK, m_lastPacketSource);
+							sendPacketWithTDMAHeader(emptyPacket, PACKET_TYPE::ACK, m_lastPacketSource, m_txTimeWindow);
 							m_rxWindowDone = true;
+							RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Radio: Join request acked");
 						}
-						else{                                                   // node has already registered
+						else{                                                   // node has already been registered
 							uint8_t requesterTxTimewindow = static_cast<uint8_t>(it - m_regNodes.begin());
 							std::vector<uint8_t> emptyPacket;
 							sendPacketWithTDMAHeader(emptyPacket, PACKET_TYPE::NACK, m_lastPacketSource, requesterTxTimewindow);
-							m_rxWindowDone = true;               
+							m_rxWindowDone = true;      
+							RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Radio: Join request nacked");   
 						}
 						break;
 					}
@@ -427,13 +411,13 @@ class TDMARadio : public RnpInterface
 					case PACKET_TYPE::NORMAL: {                                  // handling RNP packet
 						std::vector<uint8_t> emptyPacket;
 						sendPacketWithTDMAHeader(emptyPacket, PACKET_TYPE::ACK, m_lastPacketSource);
-						RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Radio receive");
 						m_rxWindowDone = true; 
+						RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Radio: Received RNP packet");
 						break; 
 					}
 		
 					default: {                                                  // handling other packet
-						RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Received other packet type: " + std::to_string(m_lastPacketType));
+						RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Radio: Received other packet type: " + std::to_string(m_lastPacketType));
 						m_rxWindowDone = true;
 						break;
 					}
@@ -444,10 +428,6 @@ class TDMARadio : public RnpInterface
 		}
 
 		void sync(){
-			// m_networkTimeShift = (m_lastPacketTimeWindow - m_currTimeWindow) * m_timeWindowLength;	// number of timewindows that the timing of the node is shifted
-			// m_networkTimeShift += (m_timeLastPacketReceived - static_cast<uint32_t>(m_physicalLayer.calculateAirtime(m_lastPacketSize)*1e3f)) - m_timeMovedTimeWindow;	// fraction of a timewindow that the timing of the node is shifted
-			// RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Network time shift = " + std::to_string(m_networkTimeShift));
-
 			m_currTimeWindow = m_lastPacketTimeWindow;    // sync local current timewindow to network
 			m_txTimeWindow = m_lastPacketRegNodes;        // set to send join request in the n+1th timewindow
 			m_timeWindows = m_lastPacketRegNodes+1;       // update local number of timewindows
@@ -458,6 +438,7 @@ class TDMARadio : public RnpInterface
 		}
 
 		void initNetwork(){
+			m_regNodes.push_back(m_networkManager.getAddress());	// add own address to the list (should be first in the list of nodes)
 			m_timeWindows = m_regNodes.size() + 1;    				// there should n+1 timewindows
 			m_txTimeWindow = 0;  									// tx timewindow of this node
 			m_currTimeWindow = m_txTimeWindow;
@@ -500,22 +481,10 @@ class TDMARadio : public RnpInterface
 			packet.erase(packet.begin(), it);
 		
 			if (initial_size - static_cast<uint8_t>(packet.size()) != m_tdmaHeaderSize) {
-				throw std::runtime_error("Error unpacking TDMA header: size mismatch");
+				throw std::runtime_error("size mismatch");
 			}
 		
 		};
-
-		void updateRegisteredNodes(uint8_t rnp_node){
-			auto it = std::find(m_regNodes.begin(), m_regNodes.end(), rnp_node);
-			if (it != m_regNodes.end()){
-				throw std::runtime_error("RNP node " + std::to_string(rnp_node) + " already exists in list");
-				return;
-			}
-			else{
-				m_regNodes.push_back(rnp_node);
-				RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("RNP node " + std::to_string(rnp_node) + " added to list");
-			}
-		}
 
 		std::queue<std::vector<uint8_t>> m_sendBuffer; 
 
@@ -528,7 +497,6 @@ class TDMARadio : public RnpInterface
 		uint32_t m_timeMovedTimeWindow = 0;
 		uint32_t m_timeWindowLength;
 		uint32_t m_timeLastPacketReceived;
-		int32_t m_networkTimeShift = 0;
 		static constexpr uint32_t m_discoveryTimeout = 10e3;
 		static constexpr uint32_t m_joinRequestTimeout = 10e3;
 		uint32_t m_timeEnteredDiscovery;
@@ -562,10 +530,5 @@ class TDMARadio : public RnpInterface
 		TDMARadioInterfaceInfo m_info;
 		PhysicalLayer& m_physicalLayer;
 		RnpNetworkManager& m_networkManager;
-
-
-		// TESTING
-		bool skipInitialJoinRequest = true;
-		//
 
 };

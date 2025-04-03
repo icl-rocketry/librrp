@@ -1,4 +1,5 @@
 #include "radio_channel.h"
+#include <random>
 #include <libriccore/riccorelogging.h>
 
 RadioChannel::RadioChannel() {}
@@ -24,7 +25,13 @@ void RadioChannel::transmitPacket(const std::vector<uint8_t>& data, uint32_t air
 
 		std::lock_guard<std::mutex> lock(mtx);
 
-		if (m_collisionDetected){
+		static std::random_device rd;
+        static std::mt19937 gen(rd());
+        static std::uniform_real_distribution<> dis(0.0, 1.0);
+
+		if (dis(gen) < m_packetDropProbability) {
+            RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("RadioChannel: Packet randomly dropped");
+        } else if (m_collisionDetected){
 			RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("RadioChannel: Packet collison - packet already on air getting dropped");
 		} else{
         	// Deliver the packet to all registered receivers except the sender itself

@@ -58,7 +58,6 @@ void despawnNode(int nodeNum){
 	std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
 	if (nodeThreads[nodeNum].joinable()) {
-		std::cout << "Joining thread for node: " << nodeNum << std::endl;
 		nodeThreads[nodeNum].join();
 	}	
 
@@ -76,17 +75,18 @@ void spawnManager(){
 	uint8_t sf = 7;
 
 	spawnNode(0, freq, bw, sf);
-	// std::this_thread::sleep_for(std::chrono::seconds(5));
-	// spawnNode(1, freq, bw, sf);
+	std::this_thread::sleep_for(std::chrono::seconds(5));
+	spawnNode(1, freq, bw, sf);
 
 	std::this_thread::sleep_for(std::chrono::seconds(15));
 	despawnNode(0);
-	// despawnNode(1);
-
-	std::this_thread::sleep_for(std::chrono::seconds(2));
+	
+	std::this_thread::sleep_for(std::chrono::seconds(5));
 	spawnNode(0, freq, bw, sf);
+
 	std::this_thread::sleep_for(std::chrono::seconds(15));
 	despawnNode(0);
+	despawnNode(1);
 
 }
 

@@ -1,7 +1,17 @@
 TWO NODE TESTS
 
 1. 	node0 starts up first, node1 joins a short interval later
-	PASSED
+	SUCCESS
 
 2. 	node0 starts up first, node1 joins a short interval later, 
 	node1 restarts, tries joining again.
+	SUCCESS
+
+3.	node0 starts up first, node1 joins a short interval later,
+	node0 restarts, tries joining.
+	SUCCESS
+
+4. 	node0 starts up first, node1 joins a short interval later, 
+	node 1 does not receive join request ack/nack
+
+other: getting runtime error when unpacking rnp header sometimes
