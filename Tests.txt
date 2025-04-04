@@ -12,6 +12,8 @@ TWO NODE TESTS
 	SUCCESS
 
 4. 	node0 starts up first, node1 joins a short interval later, 
-	node 1 does not receive join request ack/nack
+	node 1 does not receive join request ack/nack,
+	requests to join after timeout
+	SUCCESS
 
 other: getting runtime error when unpacking rnp header sometimes

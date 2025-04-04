@@ -78,13 +78,7 @@ void spawnManager(){
 	std::this_thread::sleep_for(std::chrono::seconds(5));
 	spawnNode(1, freq, bw, sf);
 
-	std::this_thread::sleep_for(std::chrono::seconds(15));
-	despawnNode(0);
-	
-	std::this_thread::sleep_for(std::chrono::seconds(5));
-	spawnNode(0, freq, bw, sf);
-
-	std::this_thread::sleep_for(std::chrono::seconds(15));
+	std::this_thread::sleep_for(std::chrono::seconds(20));
 	despawnNode(0);
 	despawnNode(1);
 

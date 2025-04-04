@@ -228,7 +228,9 @@ class TDMARadio : public RnpInterface
 
 					// join request nack
 					else if(m_received && m_lastPacketType == PACKET_TYPE::NACK && m_lastPacketDest == m_networkManager.getAddress()){  
+
 						RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Radio: This node has joined before");
+						m_currTimeWindow = m_lastPacketTimeWindow;    // sync local current timewindow to network
 						m_timeWindows = m_lastPacketRegNodes + 1;
 						m_txTimeWindow = m_lastPacketInfo;	// m_lastPacketInfo field contains the tx timewindow of the requesting node in the case of a nack
 
@@ -410,7 +412,7 @@ class TDMARadio : public RnpInterface
 					
 					case PACKET_TYPE::NORMAL: {                                  // handling RNP packet
 						std::vector<uint8_t> emptyPacket;
-						sendPacketWithTDMAHeader(emptyPacket, PACKET_TYPE::ACK, m_lastPacketSource);
+						// sendPacketWithTDMAHeader(emptyPacket, PACKET_TYPE::ACK, m_lastPacketSource);
 						m_rxWindowDone = true; 
 						RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Radio: Received RNP packet");
 						break; 
