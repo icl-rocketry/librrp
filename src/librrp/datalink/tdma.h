@@ -76,6 +76,7 @@ class TDMARadio : public RnpInterface
 				m_timeWindows = 1;			// single timewindow where node just listens
 			}
 			m_timeMovedTimeWindow = millis();
+			srand(millis());
 		}
 
 		void sendPacket(RnpPacket& data) override
@@ -115,6 +116,7 @@ class TDMARadio : public RnpInterface
 				m_received = false;
 				m_txWindowDone = false;
 				m_rxWindowDone = false;
+				m_skippingTurn = false;
 			}
 		
 			if (m_currMode == TDMA_MODE::DISCOVERY){
@@ -192,18 +194,22 @@ class TDMARadio : public RnpInterface
 
 				case DISCOVERY_PHASE::JOIN_REQUEST: {
 					if(m_currTimeWindow == m_txTimeWindow){
-						std::vector<uint8_t> emptyPacket;
-						if(sendPacketWithTDMAHeader(emptyPacket, PACKET_TYPE::JOINREQUEST, m_lastPacketSource) > 0){
-							RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Radio: Join request sent");
-							m_packetSent = true;
-							m_received = false;
-							m_timeJoinRequestSent = millis();
-							m_currDiscoveryPhase = DISCOVERY_PHASE::JOIN_REQUEST_RESPONSE; // transition to waiting for response
+						if (static_cast<float>(rand())/RAND_MAX > 0.5){
+							std::vector<uint8_t> emptyPacket;
+							if(sendPacketWithTDMAHeader(emptyPacket, PACKET_TYPE::JOINREQUEST, m_lastPacketSource) > 0){
+								RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Radio: Join request sent");
+								m_packetSent = true;
+								m_received = false;
+								m_timeJoinRequestSent = millis();
+								m_currDiscoveryPhase = DISCOVERY_PHASE::JOIN_REQUEST_RESPONSE; // transition to waiting for response
+							}
+						}
+						else{
+							m_currDiscoveryPhase = DISCOVERY_PHASE::ENTRY;
 						}
 					} 
 					break;
 				}
-
 
 				case DISCOVERY_PHASE::JOIN_REQUEST_RESPONSE: {
 
@@ -500,20 +506,23 @@ class TDMARadio : public RnpInterface
 		uint32_t m_timeWindowLength;
 		uint32_t m_timeLastPacketReceived;
 		static constexpr uint32_t m_discoveryTimeout = 10e3;
-		static constexpr uint32_t m_joinRequestTimeout = 10e3;
+		static constexpr uint32_t m_joinRequestTimeout = 5e3;
 		uint32_t m_timeEnteredDiscovery;
-		uint32_t m_timeJoinRequestSent;
+		uint32_t m_timeJoinRequestSent = 0;
 
 		uint8_t m_countsNoAck = 0;
 		static constexpr uint8_t m_maxCountsNoAck = 2;
 		uint8_t m_countsNoTx = 0;
 		static constexpr uint8_t m_maxCountsNoTx = 10;
 
+		float m_joinDutyCycle = 0.5;
+
 		bool m_packetSent = false;
 		bool m_received = false;
 		bool m_synced = false;
 		bool m_txWindowDone;
 		bool m_rxWindowDone;
+		bool m_skippingTurn = false;
 
 		TDMA_MODE m_currMode = TDMA_MODE::DISCOVERY;
 

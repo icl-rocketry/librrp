@@ -31,7 +31,7 @@ std::vector<std::thread> nodeThreads(numNodes);
 
 
 void runNode(SimNode<TDMARadio<LoRaSimPhysicalLayer>>* simNode, int nodeNum) {
-	int driftPPM = (nodeNum == 0) ? -10 : 10;
+	int driftPPM = -10 + (10 - (-10)) * static_cast<float>(rand())/RAND_MAX;
 	setClockDriftPPM(driftPPM);
 
     while (nodeRunning[nodeNum].load()) {  // Check if the thread should continue running
@@ -75,12 +75,15 @@ void spawnManager(){
 	uint8_t sf = 7;
 
 	spawnNode(0, freq, bw, sf);
-	std::this_thread::sleep_for(std::chrono::seconds(5));
+	std::this_thread::sleep_for(std::chrono::seconds(3));
 	spawnNode(1, freq, bw, sf);
+	std::this_thread::sleep_for(std::chrono::seconds(3));
+	spawnNode(2, freq, bw, sf);
 
-	std::this_thread::sleep_for(std::chrono::seconds(20));
+	std::this_thread::sleep_for(std::chrono::seconds(10));
 	despawnNode(0);
 	despawnNode(1);
+	despawnNode(2);
 
 }
 
