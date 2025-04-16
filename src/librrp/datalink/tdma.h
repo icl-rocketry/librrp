@@ -219,6 +219,7 @@ class TDMARadio : public RnpInterface
 
 						m_timeWindows = m_lastPacketRegNodes + 1;   // set local number of timewindows to match network
 						m_txTimeWindow = m_timeWindows - 2;			// set local tx timewindow
+						m_currTimeWindow = m_lastPacketTimeWindow;
 
 						m_regNodes.resize(m_lastPacketRegNodes);
 						m_regNodes[m_lastPacketInfo] = m_lastPacketSource;	// m_lastPacketInfo field contains the tx timewindow of the acking node in the case of an ack
@@ -293,9 +294,12 @@ class TDMARadio : public RnpInterface
 				}
 		
 				// TODO: fix this shit
-				// if (currentMode != TDMA_MODE::DISCOVERY && packetRegNodes - static_cast<uint8_t>(registeredNodes.size()) > 0){  //local node list is shorter
-				//     registeredNodes.resize(packetRegNodes);
-				// }        
+				if (m_currMode != TDMA_MODE::DISCOVERY && m_lastPacketRegNodes - static_cast<uint8_t>(m_regNodes.size()) > 0){  //local node list is shorter
+					RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("RESIZING REG NODES: old = " + std::to_string(m_regNodes.size()) + ", new = " + std::to_string(m_lastPacketRegNodes));
+					m_regNodes.resize(m_lastPacketRegNodes);
+					m_timeWindows = m_lastPacketRegNodes + 1;
+					m_currTimeWindow = m_lastPacketTimeWindow;
+				}        
 		
 				if (data.size()){     // packet contains something after unpacking the tdma header
 		
@@ -394,30 +398,32 @@ class TDMARadio : public RnpInterface
 						
 						RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Radio: Received join request");
 		
-						auto it = find(m_regNodes.begin(), m_regNodes.end(), m_lastPacketSource);
-		
-						if(it == m_regNodes.end()){                        		// node has not been registered yet
-							m_regNodes.push_back(m_lastPacketSource);           // add to node list
-							RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Radio: RNP Node (requesting node) " + std::to_string(m_lastPacketSource) + " added to list");
-							m_timeWindows = m_regNodes.size() + 1;             	// update number of timewindows
-							std::vector<uint8_t> emptyPacket;
-							sendPacketWithTDMAHeader(emptyPacket, PACKET_TYPE::ACK, m_lastPacketSource, m_txTimeWindow);
-							m_rxWindowDone = true;
-							RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Radio: Join request acked");
-						}
-						else{                                                   // node has already been registered
-							uint8_t requesterTxTimewindow = static_cast<uint8_t>(it - m_regNodes.begin());
-							std::vector<uint8_t> emptyPacket;
-							sendPacketWithTDMAHeader(emptyPacket, PACKET_TYPE::NACK, m_lastPacketSource, requesterTxTimewindow);
-							m_rxWindowDone = true;      
-							RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Radio: Join request nacked");   
+						if (m_lastPacketDest == m_networkManager.getAddress()){
+							auto it = find(m_regNodes.begin(), m_regNodes.end(), m_lastPacketSource);
+			
+							if(it == m_regNodes.end()){                        		// node has not been registered yet
+								m_regNodes.push_back(m_lastPacketSource);           // add to node list
+								RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Radio: RNP Node (requesting node) " + std::to_string(m_lastPacketSource) + " added to list");
+								m_timeWindows = m_regNodes.size() + 1;             	// update number of timewindows
+								std::vector<uint8_t> emptyPacket;
+								sendPacketWithTDMAHeader(emptyPacket, PACKET_TYPE::ACK, m_lastPacketSource, m_txTimeWindow);
+								m_rxWindowDone = true;
+								RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Radio: Join request acked");
+							}
+							else{                                                   // node has already been registered
+								uint8_t requesterTxTimewindow = static_cast<uint8_t>(it - m_regNodes.begin());
+								std::vector<uint8_t> emptyPacket;
+								sendPacketWithTDMAHeader(emptyPacket, PACKET_TYPE::NACK, m_lastPacketSource, requesterTxTimewindow);
+								m_rxWindowDone = true;      
+								RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Radio: Join request nacked");   
+							}
 						}
 						break;
 					}
 						
 					
 					case PACKET_TYPE::NORMAL: {                                  // handling RNP packet
-						std::vector<uint8_t> emptyPacket;
+						// std::vector<uint8_t> emptyPacket;
 						// sendPacketWithTDMAHeader(emptyPacket, PACKET_TYPE::ACK, m_lastPacketSource);
 						m_rxWindowDone = true; 
 						RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Radio: Received RNP packet");
