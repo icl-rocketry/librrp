@@ -74,6 +74,10 @@ public:
         return &m_simphysicallayer;
     }
 
+	int getNodeNum() {
+		return m_nodeNum;
+	}
+
 private:
 	int m_nodeNum;
 	bool m_pushDummyPackets;

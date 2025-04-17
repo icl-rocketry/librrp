@@ -423,15 +423,39 @@ class TDMARadio : public RnpInterface
 						
 					
 					case PACKET_TYPE::NORMAL: {                                  // handling RNP packet
+						RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Radio: Received RNP packet");
 						// std::vector<uint8_t> emptyPacket;
 						// sendPacketWithTDMAHeader(emptyPacket, PACKET_TYPE::ACK, m_lastPacketSource);
+						if (m_lastPacketSource != m_regNodes[m_currTimeWindow]){
+							if (!m_regNodes[m_currTimeWindow]){
+								m_regNodes[m_currTimeWindow] = m_lastPacketSource;
+								RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Radio: Updating 0 value with missed address " + std::to_string(m_lastPacketSource));
+							}
+							else{
+								RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Radio: Received packet from " + std::to_string(m_lastPacketSource) + " when expecting " + std::to_string(m_regNodes[m_currTimeWindow]));
+							}
+						}
 						m_rxWindowDone = true; 
-						RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Radio: Received RNP packet");
+						break; 
+					}
+
+					case PACKET_TYPE::HEARTBEAT: { 
+						RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Radio: Received heartbeat packet");
+						if (m_lastPacketSource != m_regNodes[m_currTimeWindow]){
+							if (!m_regNodes[m_currTimeWindow]){
+								m_regNodes[m_currTimeWindow] = m_lastPacketSource;
+								RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Radio: Updating 0 value with missed address " + std::to_string(m_lastPacketSource));
+							}
+							else{
+								RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Radio: Received packet from " + std::to_string(m_lastPacketSource) + " when expecting " + std::to_string(m_regNodes[m_currTimeWindow]));
+							}
+						}
+						m_rxWindowDone = true; 
 						break; 
 					}
 		
 					default: {                                                  // handling other packet
-						RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Radio: Received other packet type: " + std::to_string(m_lastPacketType));
+						RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Radio: Received packet type: " + std::to_string(m_lastPacketType));
 						m_rxWindowDone = true;
 						break;
 					}

@@ -23,7 +23,7 @@
 
 #include "../SimNode.h"
 
-int numNodes = 2;
+int numNodes = 3;
 std::mutex nodeMutex;
 std::vector<std::unique_ptr<SimNode<TDMARadio<LoRaSimPhysicalLayer>>>> simNodes(numNodes);
 std::vector<std::atomic<bool>> nodeRunning(numNodes);
