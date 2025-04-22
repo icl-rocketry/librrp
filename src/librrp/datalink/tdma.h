@@ -76,7 +76,8 @@ class TDMARadio : public RnpInterface
 				m_timeWindows = 1;			// single timewindow where node just listens
 			}
 			m_timeMovedTimeWindow = millis();
-			srand(millis());
+			srand(millis() ^ reinterpret_cast<uintptr_t>(this));
+			m_discoveryTimeout = 8000 + rand() % 4000;
 		}
 
 		void sendPacket(RnpPacket& data) override
@@ -535,7 +536,7 @@ class TDMARadio : public RnpInterface
 		uint32_t m_timeMovedTimeWindow = 0;
 		uint32_t m_timeWindowLength;
 		uint32_t m_timeLastPacketReceived;
-		static constexpr uint32_t m_discoveryTimeout = 10e3;
+		uint32_t m_discoveryTimeout = 10e3;
 		static constexpr uint32_t m_joinRequestTimeout = 5e3;
 		uint32_t m_timeEnteredDiscovery;
 		uint32_t m_timeJoinRequestSent = 0;

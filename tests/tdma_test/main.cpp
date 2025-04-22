@@ -75,15 +75,16 @@ void spawnManager(){
 	uint8_t sf = 7;
 
 	spawnNode(0, freq, bw, sf);
-	std::this_thread::sleep_for(std::chrono::seconds(3));
+	// std::this_thread::sleep_for(std::chrono::seconds(2));
 	spawnNode(1, freq, bw, sf);
-	std::this_thread::sleep_for(std::chrono::seconds(3));
+	// std::this_thread::sleep_for(std::chrono::seconds(2));
 	spawnNode(2, freq, bw, sf);
 
-	std::this_thread::sleep_for(std::chrono::seconds(10));
+	std::this_thread::sleep_for(std::chrono::seconds(60));
 	despawnNode(0);
 	despawnNode(1);
 	despawnNode(2);
+
 
 }
 
