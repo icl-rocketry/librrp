@@ -7,15 +7,16 @@
 #include <queue>
 
 // Ric
-#include <libriccore/riccorelogging.h>
 #include <librnp/rnp_interface.h>
 #include <librnp/rnp_packet.h>
 #include <librnp/rnp_networkmanager.h>
+#include <libriccore/riccorelogging.h>
 
-#include <librrp/rrp_nvs_save.h>
+
+// #include <librrp/rrp_nvs_save.h>
 
 
-struct TimeoutRadioInterfaceInfo : public RnpInterfaceInfo {
+struct RadioInterfaceInfo : public RnpInterfaceInfo {
     uint32_t prevTimeSent;
     uint32_t prevTimeReceived;
     size_t currentSendBufferSize;
@@ -25,6 +26,12 @@ struct TimeoutRadioInterfaceInfo : public RnpInterfaceInfo {
     size_t sendBufferSize;
 	uint32_t txCount;
 	uint32_t rxCount;
+
+	    int rssi;
+    int packet_rssi;
+    float snr;
+    float packet_snr;
+    long freqError;
 };
 
 struct TimeoutConfig {
@@ -38,10 +45,11 @@ public:
 		RnpNetworkManager& networkManager,
         uint8_t id = 2, 
         std::string name = "Timeout radio")
-        : _physicalLayer(physicalLayer), 
+        : RnpInterface(id, name),
+		  _physicalLayer(physicalLayer), 
 		  _networkManager(networkManager),
-          _info{}, 
-          RnpInterface(id, name) {
+          _info{} 
+		  {
             _info.MTU = 256;
             _info.sendBufferSize = 2048;
 			_info.txCount = 0;
@@ -49,7 +57,11 @@ public:
           }
 
     void setup() override {
-        _physicalLayer.setup();
+        if (!_physicalLayer.setup())
+		{
+            RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Timeout Radio: failed to setup physical layer");
+			return ;
+		}
 		_physicalLayer.setChannel(0);
     }
 
@@ -142,46 +154,46 @@ public:
         return &_info;
     }
 
-    const TimeoutConfig& getConfig() const {
-        return _config;
-    }
+    // const TimeoutConfig& getConfig() const {
+    //     return _config;
+    // }
 
-    void setConfig(TimeoutConfig config)
-    {
-        _config = config;
-        _physicalLayer.restart();
-    }
+    // void setConfig(TimeoutConfig config)
+    // {
+    //     _config = config;
+    //     _physicalLayer.restart();
+    // }
 
-    void setConfig(TimeoutConfig config, bool overrideNVS) {
-        _config = config;
-        _physicalLayer.restart();
-        if (overrideNVS) {
-            saveConf();
-        }
-    }
+    // void setConfig(TimeoutConfig config, bool overrideNVS) {
+    //     _config = config;
+    //     _physicalLayer.restart();
+    //     if (overrideNVS) {
+    //         saveConf();
+    //     }
+    // }
 
 
-    void saveConf() {
-        RrpNvsSave::SaveValueToNVS("Timeout Radio Config", "turnTimeout", _config.turnTimeout);
-        RrpNvsSave::SaveValueToNVS("Timeout Radio Config", "sendBufferSize", _info.sendBufferSize);
-    }
+    // void saveConf() {
+    //     RrpNvsSave::SaveValueToNVS("Timeout Radio Config", "turnTimeout", _config.turnTimeout);
+    //     RrpNvsSave::SaveValueToNVS("Timeout Radio Config", "sendBufferSize", _info.sendBufferSize);
+    // }
 
-    void loadConf() {
-        _config = defaultConfig;
+    // void loadConf() {
+    //     _config = defaultConfig;
 
-        if(!RrpNvsSave::ReadValueFromNVS("Timeout Radio Config", "turnTimeout", _config.turnTimeout)){
-            RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Turn timeout not configured!");
-        }
+    //     if(!RrpNvsSave::ReadValueFromNVS("Timeout Radio Config", "turnTimeout", _config.turnTimeout)){
+    //         RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Turn timeout not configured!");
+    //     }
 
-        if(!RrpNvsSave::ReadValueFromNVS("Timeout Radio Config", "sendBufferSize", _info.sendBufferSize)){
-            RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Send buffer size of turn timeout radio not configured!");
-        }
-    };
+    //     if(!RrpNvsSave::ReadValueFromNVS("Timeout Radio Config", "sendBufferSize", _info.sendBufferSize)){
+    //         RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("Send buffer size of turn timeout radio not configured!");
+    //     }
+    // };
 
 private:
     PhysicalLayer& _physicalLayer;
 	RnpNetworkManager& _networkManager;
-    TimeoutRadioInterfaceInfo _info;
+    RadioInterfaceInfo _info;
     TimeoutConfig _config;
     static constexpr TimeoutConfig defaultConfig{static_cast<uint32_t>(250)};
 

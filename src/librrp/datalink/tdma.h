@@ -106,7 +106,6 @@ class TDMARadio : public RnpInterface
 		void update() override
 		{
 			getPacket();	// gotta scan for packets on every loop otherwise packet time-based info is inaccurate
-
 			if (millis() - (m_timeMovedTimeWindow) >= m_timeWindowLength){
 				m_currTimeWindow = (m_currTimeWindow + 1) % m_timeWindows;	// shift timewindow
 				RicCoreLogging::log<RicCoreLoggingConfig::LOGGERS::SYS>("TDMA Radio: Shifted timewindow to " + std::to_string(m_currTimeWindow));

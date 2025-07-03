@@ -2,6 +2,7 @@
 #include <thread>
 #include <sstream>
 #include <libriccore/platform/millis.h>
+#include <libriccore/riccorelogging.h>
 
 RadioChannelManager LoRaSimPhysicalLayer::radioChannelManager;
 

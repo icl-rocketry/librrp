@@ -2,14 +2,16 @@
 cmake_minimum_required(VERSION 3.16.3)
 
 if (ESP_PLATFORM)
-    idf_component_register(INCLUDE_DIRS src
-                           REQUIRES arduino app_update librnp libriccore) #requires arduino....
+	idf_component_register(INCLUDE_DIRS src
+                           REQUIRES arduino app_update librnp libriccore RadioLib) #requires arduino....
     #we need some wizardry so we keep the nice original cmake structure
     #we add the src subdirectory where the static library is defined
     add_subdirectory(src) 
     #we need to explictly link the arduino component here as librnp has a couple dependancies on the arduino library when used for esp32
     target_link_libraries(librrp PRIVATE idf::arduino) 
     target_link_libraries(librrp PRIVATE idf::app_update) 
+	target_link_libraries(librrp PRIVATE idf::RadioLib)
+	target_link_libraries(librrp PRIVATE idf::libriccore)
     #link the orignal cmake librnp library to the component library 
     target_link_libraries(${COMPONENT_LIB} INTERFACE librrp)
     return()

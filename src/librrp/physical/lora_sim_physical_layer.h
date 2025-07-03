@@ -11,7 +11,6 @@
 #include <algorithm>
 
 // ric
-#include <libriccore/riccorelogging.h>
 #include "radio_channel_manager.h"
 #include "radio_channel.h"
 
